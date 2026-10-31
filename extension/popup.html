@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>PhishShield AI</title>
+  </head>
+  <body>
+    <header>
+      <svg viewBox="0 0 64 64" width="26" height="26" aria-hidden="true">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee" /><stop offset="1" stop-color="#8b5cf6" /></linearGradient></defs>
+        <path d="M32 4 8 13v17c0 15 10 26 24 30 14-4 24-15 24-30V13L32 4Z" fill="url(#g)" />
+        <path d="m22 32 7 7 13-14" fill="none" stroke="#05070f" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <h1>PhishShield <span>AI</span></h1>
+      <button id="settings-btn" title="Settings" aria-label="Settings">⚙</button>
+    </header>
+
+    <section id="settings" hidden>
+      <label for="server">Server URL</label>
+      <div class="row">
+        <input id="server" placeholder="https://your-app.onrender.com" />
+        <button id="save">Save</button>
+      </div>
+    </section>
+
+    <section class="card" id="page-card">
+      <div class="label">This page</div>
+      <div id="page-url" class="mono">—</div>
+      <div id="page-result" class="result loading">Scanning…</div>
+    </section>
+
+    <section class="card">
+      <div class="label">Scan a message</div>
+      <textarea id="text" rows="4" placeholder="Paste an email, SMS or chat message…"></textarea>
+      <button id="scan-text" class="primary">Analyze</button>
+      <div id="text-result" class="result" hidden></div>
+    </section>
+
+    <footer><a id="open-app" href="#" target="_blank">Open full analyzer ↗</a></footer>
+    <script src="popup.js"></script>
+  </body>
+</html>

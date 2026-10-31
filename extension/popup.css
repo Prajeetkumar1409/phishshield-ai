@@ -1,0 +1,36 @@
+* { box-sizing: border-box; }
+body {
+  width: 360px; margin: 0; padding: 14px;
+  font: 13px/1.45 Inter, system-ui, sans-serif; color: #cbd5e1;
+  background: radial-gradient(ellipse at top, #0f1a33, #05070f 70%);
+}
+header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+h1 { flex: 1; margin: 0; font-size: 16px; color: #fff; }
+h1 span { background: linear-gradient(90deg, #67e8f9, #a78bfa); -webkit-background-clip: text; color: transparent; }
+#settings-btn { background: none; border: 0; color: #94a3b8; font-size: 16px; cursor: pointer; }
+.card, #settings { border: 1px solid rgb(255 255 255 / .1); background: rgb(255 255 255 / .03); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+.label, label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #64748b; margin-bottom: 6px; }
+.mono { font-family: ui-monospace, monospace; font-size: 11px; color: #94a3b8; word-break: break-all; }
+.row { display: flex; gap: 6px; }
+input, textarea {
+  width: 100%; border: 1px solid rgb(255 255 255 / .1); background: #0a0f1e; color: #e2e8f0;
+  border-radius: 8px; padding: 8px; font: inherit; resize: vertical; outline: none;
+}
+input:focus, textarea:focus { border-color: rgb(34 211 238 / .5); }
+button { border: 1px solid rgb(255 255 255 / .12); background: rgb(255 255 255 / .06); color: #e2e8f0; border-radius: 8px; padding: 7px 12px; cursor: pointer; font: inherit; }
+button.primary { width: 100%; margin-top: 8px; border: 0; font-weight: 600; color: #05070f; background: linear-gradient(90deg, #22d3ee, #8b5cf6); }
+button:disabled { opacity: .6; cursor: wait; }
+.result { margin-top: 10px; }
+.result.loading { color: #64748b; }
+.verdict { display: flex; align-items: center; gap: 10px; }
+.score { font-size: 26px; font-weight: 700; color: #fff; min-width: 44px; }
+.pill { padding: 3px 10px; border-radius: 999px; font-weight: 600; font-size: 12px; }
+.safe .pill { background: rgb(52 211 153 / .12); color: #6ee7b7; }
+.suspicious .pill { background: rgb(251 191 36 / .12); color: #fcd34d; }
+.phishing .pill { background: rgb(244 63 94 / .14); color: #fda4af; }
+.summary { margin: 8px 0 4px; color: #e2e8f0; }
+ul { margin: 6px 0 0; padding-left: 16px; color: #94a3b8; }
+li { margin: 2px 0; }
+.error { color: #fda4af; }
+footer { text-align: center; }
+footer a { color: #67e8f9; text-decoration: none; font-size: 12px; }

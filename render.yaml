@@ -1,0 +1,14 @@
+# Render Blueprint — one web service: Express API + built React app on the same origin.
+services:
+  - type: web
+    name: phishshield-ai
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22

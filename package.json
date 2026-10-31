@@ -1,0 +1,15 @@
+{
+  "name": "phishshield-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-powered phishing & scam detection for emails, SMS, URLs and chat messages",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "build": "npm --prefix server ci --omit=dev && npm --prefix client ci --include=dev && npm --prefix client run build",
+    "start": "npm --prefix server start",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "test": "npm --prefix server test"
+  }
+}
