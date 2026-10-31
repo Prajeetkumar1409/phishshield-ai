@@ -175,6 +175,8 @@ pre.preview{margin:0;max-height:360px;overflow:auto;background:var(--card2);bord
 .msg.ai{background:var(--card2);border:1px solid var(--line);border-bottom-left-radius:6px}
 .msg.me{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:6px}
 .narr p+p{margin-top:10px}
+.body-text{white-space:pre-wrap;background:var(--card2);border:1px solid var(--line);border-radius:18px;padding:16px;font-size:14px;max-height:280px;overflow:auto}
+mark{background:var(--amber-soft);color:var(--amber);border-radius:6px;padding:0 3px;font-weight:700}
 .report-sec{break-inside:avoid}
 .report-sec h2{display:flex;gap:10px;align-items:center}
 .report-sec h2 .n{font-family:var(--mono);font-size:13px;color:var(--pink)}
@@ -252,6 +254,7 @@ const PRESETS = [
     ip:'203.0.113.45', asn:'AS64500 · ExampleNet VPS', country:'Netherlands (NL)', hosting:'BulletHost VPS (fictional)',
     url:'https://micros0ft-secure-login.com/owa/auth?session=8f2c41', urlRisk:92, domainAge:3, domainAgeOf:'url',
     redirectChain:['https://micros0ft-secure-login.com/owa/auth?session=8f2c41','https://cdn-redirect.click/r/8f2c41','https://login.micros0ft-secure-login.com/common/oauth2/authorize'],
+    body:'Dear user,\n\nYour Microsoft 365 mailbox password expires in 24 hours. To avoid losing access to your email, verify your account immediately using the secure link below:\n\nKeep my password: https://micros0ft-secure-login.com/owa/auth?session=8f2c41\n\nIf you do not act today your mailbox will be suspended. The updated password policy is attached.\n\nMicrosoft 365 Security Team',
     attachment:'Password_Policy_2026.html', entropy:4.9, hash:'9f2b7c41e0a3d58c6b14f7e29a0c3d5e8b71f46a2c9d0e3b5a7f81c64d2e9b03'
   },
   {
@@ -264,6 +267,7 @@ const PRESETS = [
     ip:'198.51.100.77', asn:'AS64505 · Offshore Transit (fictional)', country:'Moldova (MD)', hosting:'Offshore VPS Ltd (fictional)',
     url:'http://northwind-freight-docs.top/d/INV-20931', urlRisk:88, domainAge:1, domainAgeOf:'url',
     redirectChain:['http://northwind-freight-docs.top/d/INV-20931','http://198.51.100.77/r.php?i=20931','http://cdn-files-share.top/gate?id=20931','http://cdn-files-share.top/f/Invoice_INV-20931.iso'],
+    body:'Hello,\n\nThis is the final notice for overdue invoice #INV-20931. Payment was due 30 days ago. Please open the attached invoice immediately to review the outstanding amount, otherwise we will start legal action against your company.\n\nDownload a copy: http://northwind-freight-docs.top/d/INV-20931\n\nNorthwind Freight Billing',
     attachment:'Invoice_INV-20931.pdf.iso', entropy:7.82, hash:'e3c1a9f07b52d4486ce19a3f7b20d5c8e61f4a97b03c2d58e9a1f6c47b30d2e5'
   },
   {
@@ -275,6 +279,7 @@ const PRESETS = [
     auth:{spf:true, dkim:true, dmarc:false}, hops:[38,74,52],
     ip:'192.0.2.140', asn:'AS64510 · GenericCloud Mail (fictional)', country:'United States (US)', hosting:'GenericCloud Mail (fictional)',
     url:null, urlRisk:null, domainAge:6, domainAgeOf:'sender', redirectChain:[],
+    body:"Hi,\n\nI'm in a board meeting and can't talk on the phone. I need you to process an urgent wire transfer of $48,750 to a new vendor today. This is strictly confidential, please don't discuss it with anyone until the deal is announced.\n\nReply to me directly and I'll send the bank details.\n\nDaniel\nSent from my phone",
     attachment:null, entropy:null, hash:null
   },
   {
@@ -286,6 +291,7 @@ const PRESETS = [
     ip:'192.0.2.25', asn:'AS64496 · ExampleESP (fictional)', country:'Germany (DE)', hosting:'Mainstream ESP (fictional)',
     url:'https://click.engineering.example.com/t/142?u=weekly', urlRisk:6, domainAge:2900, domainAgeOf:'url',
     redirectChain:['https://click.engineering.example.com/t/142?u=weekly','https://engineering.example.com/weekly/142'],
+    body:"Hi team,\n\nThis week: how we moved a service to Rust in production, three ways we cut CI time by 40%, and notes from the platform guild.\n\nRead the full issue: https://click.engineering.example.com/t/142?u=weekly\n\nThe PDF edition is attached. You're receiving this because you subscribed to Engineering Weekly.",
     attachment:'weekly-142.pdf', entropy:7.4, hash:'4a7d1c93e2b06f58a1d3c7e94b20f6a8d5c13e79b4a02f6d8c1e5b37a9f04d26'
   }
 ].map(c => ({...c, source:'demo', redirects: Math.max(0, c.redirectChain.length - 1)}));
@@ -389,6 +395,35 @@ const SHORTENERS = ['bit.ly','tinyurl.com','t.co','goo.gl','is.gd','cutt.ly','ow
 const FREEMAIL = new Set(['gmail.com','outlook.com','hotmail.com','yahoo.com','aol.com','icloud.com','gmx.com','mail.com','proton.me','protonmail.com','freemail.example']);
 const URGENCY = ['urgent','immediately','action required','expire','final notice','overdue','suspend','verify','password','wire','confidential','invoice','payment','24 hours','today','locked','unusual','legal action'];
 
+const LEXICON = {
+  'Urgency': ['urgent','immediately','action required','expires','expire','24 hours','today','final notice','asap','right away','deadline','as soon as possible'],
+  'Credential theft': ['password','verify your account','verify','login','log in','sign in','credentials','mailbox','reset','confirm your'],
+  'Financial pressure': ['wire transfer','wire','bank details','payment','invoice','overdue','outstanding amount','refund','gift card','new vendor'],
+  'Threat / fear': ['suspended','suspend','locked','legal action','disabled','terminated','losing access','penalty','unusual activity'],
+  'Secrecy': ['confidential',"don't discuss",'do not discuss','do not share',"don't tell",'keep this between','discreet'],
+  'Authority / pretext': ['board meeting',"can't talk",'security team','it support','ceo','administrator','sent from my phone'],
+  'Lure to act': ['open the attached','click here','download','keep my password','use the link','reply to me directly']
+};
+const reEsc = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/* Phishing-style wording in subject, body, display name and attachment name */
+function languageFindings(c){
+  const fields = [['subject', c.subject], ['body', c.body], ['display name', c.fromName], ['attachment name', c.attachment]];
+  const out = [];
+  for (const [cat, terms] of Object.entries(LEXICON)){
+    for (const term of terms){
+      const re = new RegExp('(^|[^a-z])' + reEsc(term) + '(?![a-z])', 'i');
+      const where = fields.filter(([, v]) => v && re.test(v)).map(([k]) => k);
+      if (where.length && !out.some(o => o.term.includes(term) || term.includes(o.term))) out.push({cat, term, where});
+    }
+  }
+  return out;
+}
+function highlightBody(c){
+  const terms = languageFindings(c).map(f => esc(f.term)).sort((a, b) => b.length - a.length);
+  const html = esc(pii(c, c.body || ''));
+  if (!terms.length) return html;
+  return html.replace(new RegExp('(^|[^a-z])(' + terms.map(reEsc).join('|') + ')(?![a-z])', 'gi'), '$1<mark>$2</mark>');
+}
 function regDomain(h){
   const p = h.split('.');
   if (p.length <= 2) return h;
@@ -482,6 +517,14 @@ function componentsOf(c){
   const hits = URGENCY.filter(k => subj.includes(k));
   add('subject', 'Subject line', c.subject || '(none)', 0.5,
     hits.length ? [{w:Math.min(64, 16*hits.length), t:`Pressure / urgency wording: ${hits.join(', ')}`}] : [], {route:'headers'});
+
+  // 4b. Body text (language)
+  if (c.body){
+    const lf = languageFindings(c).filter(f => f.where.includes('body'));
+    const cats = [...new Set(lf.map(f => f.cat))];
+    add('body', 'Body text', (c.body.length > 70 ? c.body.slice(0, 70) + '…' : c.body).replace(/\s+/g, ' '), 0.5,
+      cats.map(cat => ({w:12, t:`${cat} wording: ${lf.filter(f => f.cat === cat).map(f => `"${f.term}"`).join(', ')}`})), {route:'ai'});
+  }
 
   // 5. Authentication
   const ra = [];
@@ -636,43 +679,124 @@ function exportText(c, list, fmt){
 /* =====================================================================
    SIMULATED AI CHAT: keyword rules over the active case's fields
    ===================================================================== */
+function lev(a, b){
+  if (Math.abs(a.length - b.length) > 2) return 9;
+  const d = Array.from({length:a.length + 1}, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+/* Common words that must only match exactly (so "there" never fuzzes to "where") */
+const STOP = new Set(['the','then','there','their','them','they','this','that','these','what','with','have','does','did','is','are','was','were','and','for','you','your','can','will','its','it','in','on','of','to','a','an','me','my','be','any','all','how','has','had','not']);
+/* Does a question word match a topic word? Exact, shared stem, or a small typo. */
+function wordMatch(tok, w){
+  if (tok === w) return 1.2;
+  if (STOP.has(tok)) return 0;
+  if (w.length >= 4 && tok.length >= 4 && (tok.startsWith(w) || w.startsWith(tok))) return 1;
+  const tol = w.length >= 8 ? 2 : w.length >= 4 ? 1 : 0;
+  return tol && lev(tok, w) <= tol ? 0.9 : 0;
+}
+const INTENTS = [
+  {id:'greet', w:0.5, words:['hi','hello','hey','thanks','thank','thx']},
+  {id:'attrib', w:1, words:['who','attribution','attribute','actor','behind','apt','hacker','attacker','criminal']},
+  {id:'keywords', w:1.1, words:['keyword','keywords','word','words','phrase','phrases','language','wording','term','terms','tone','urgency','pressure','manipulation','social','engineering','trigger','flags','suspicious']},
+  {id:'body', w:1, words:['body','content','message','text','says','say','read','wrote','written','contents']},
+  {id:'auth', w:1, words:['spf','dkim','dmarc','authentication','authenticated','spoof','spoofed','spoofing','signature','signed','alignment']},
+  {id:'sender', w:1, words:['sender','from','reply','replyto','address','impersonation','impersonating','lookalike','display','name','who sent']},
+  {id:'recipient', w:1, words:['recipient','recipients','victim','targeted','received by','sent to']},
+  {id:'subject', w:1, words:['subject','title','headline']},
+  {id:'date', w:1, words:['date','when','time','timestamp']},
+  {id:'url', w:1, words:['url','urls','link','links','redirect','redirects','domain','https','click','website','site','landing','page']},
+  {id:'attach', w:1, words:['attachment','attachments','attached','file','files','hash','sha','sha256','entropy','sandbox','malware','payload','macro','iso','ransomware','lockbit','exe','document']},
+  {id:'infra', w:1, words:['ip','asn','country','hosting','host','hosted','infrastructure','where','server','geolocation','location','origin','located','provider']},
+  {id:'mitre', w:1, words:['mitre','technique','techniques','att&ck','tactic','tactics','ttp','ttps']},
+  {id:'hops', w:1, words:['hop','hops','latency','received','delay','route','path','relay','delivery']},
+  {id:'tokens', w:1, words:['token','tokens','component','components','quarantine','quarantined','pii','mask','isolate','isolation']},
+  {id:'why', w:0.8, words:['why','explain','reason','reasons','evidence','proof','signals','because']},
+  {id:'recs', w:0.9, words:['recommend','recommendation','next','action','actions','respond','response','remediate','mitigate','should','shud','shld','fix','prevent','protect','steps','handle','do now','i do','we do','to do','next steps']},
+  {id:'ioc', w:1, words:['ioc','iocs','indicator','indicators','export','stix','csv','json','block','blocklist']},
+  {id:'risk', w:0.7, words:['risk','score','verdict','safe','phishing','phish','legit','legitimate','dangerous','danger','confidence','malicious','harmful','genuine','classification','spam','scam','fraud','bad','trust']},
+  {id:'summary', w:0.6, words:['summary','summarize','summarise','overview','describe','about','tldr','case','everything']}
+];
+function intentsOf(q){
+  const toks = q.toLowerCase().replace(/[^a-z0-9&@.\s-]/g, ' ').split(/\s+/).filter(Boolean);
+  const text = ' ' + toks.join(' ') + ' ';
+  return INTENTS.map(it => {
+    let sc = 0;
+    for (const w of it.words){
+      if (w.includes(' ')){ if (text.includes(' ' + w + ' ')) sc += 1.5; continue; }
+      let best = 0; for (const t of toks) best = Math.max(best, wordMatch(t, w));
+      sc += best;
+    }
+    return {id:it.id, score:sc * it.w};
+  }).filter(x => x.score >= 0.6).sort((a, b) => b.score - a.score);
+}
+const ANSWERS = {
+  greet: c => `Hi! Ask me anything about "${c.name}": the suspicious keywords, the link, the attachment, authentication, or what to do next.`,
+  attrib: c => `I can't attribute this to a person or group. TRACE-X only sees infrastructure: ${c.ip || 'no IP'}${c.country ? `, geolocated (simulated) to ${c.country}` : ''}. Hosting location is not attribution, and attackers rent servers anywhere.`,
+  keywords: c => {
+    const f = languageFindings(c);
+    const host = [...new Set([domainOf(c.from), c.url && hostOf(c.url)].filter(Boolean).flatMap(h => KEYWORDS.filter(k => h.includes(k))))];
+    if (!f.length && !host.length) return 'I found no phishing-style wording in the subject, body, display name or attachment name of this email.';
+    const cats = [...new Set(f.map(x => x.cat))];
+    return (f.length ? `Suspicious wording found (${f.length}):\n` + cats.map(cat => `• ${cat}: ` + f.filter(x => x.cat === cat).map(x => `"${x.term}" (${x.where.join(', ')})`).join(', ')).join('\n') : 'No suspicious wording in the text itself.')
+      + (host.length ? `\n• Credential words inside the domains: ${host.join(', ')}` : '')
+      + (c.body ? '\nThe matched words are highlighted in the "Suspicious language" card above.' : '');
+  },
+  body: c => c.body ? `The message says:\n"${pii(c, c.body.length > 600 ? c.body.slice(0, 600) + '…' : c.body)}"` : 'No readable body text was found in this email.',
+  auth: c => `SPF ${authTxt(c.auth.spf)}, DKIM ${authTxt(c.auth.dkim)}, DMARC ${authTxt(c.auth.dmarc)} for ${domainOf(c.from) || 'the sender'}. `
+    + (authFails(c) ? `${authFails(c)} check(s) did not pass.` + (c.auth.spf && c.auth.dkim && !c.auth.dmarc ? ' SPF and DKIM pass for a look-alike domain, but DMARC alignment fails.' : '')
+                    : 'All pass. That shows the domain really sent it, not that the domain is trustworthy.'),
+  sender: c => {
+    const fd = domainOf(c.from), sig = fd ? hostSignals(fd) : [];
+    return `From: ${pii(c, c.from) || 'unknown'}${c.fromName ? ` ("${c.fromName}")` : ''}. Reply-To: ${pii(c, c.replyTo) || 'none'}.`
+      + (c.replyTo && domainOf(c.replyTo) !== fd ? ' The Reply-To domain differs, so replies go to someone else. That is a classic BEC / fraud pattern.' : '')
+      + (sig.length ? ` Sender domain signals: ${sig.map(r => r.t).join('; ')}.` : ' No look-alike signals in the sender domain.')
+      + (c.domainAgeOf === 'sender' && c.domainAge != null ? ` The sender domain is ${c.domainAge} days old.` : '');
+  },
+  recipient: c => `It was sent to ${pii(c, c.to) || 'an unknown recipient'}. Turn on "Mask PII" on the Tokens screen to replace addresses with tokens before sharing.`,
+  subject: c => {
+    const f = languageFindings(c).filter(x => x.where.includes('subject'));
+    return `Subject: "${c.subject || '(none)'}".` + (f.length ? ` Pressure words in it: ${f.map(x => `"${x.term}"`).join(', ')}.` : ' No pressure wording in the subject.');
+  },
+  date: c => `The Date header says ${c.date || 'nothing (missing)'}.` + (c.hops.length ? ` Delivery took ${c.hops.reduce((a, b) => a + b, 0)} ms across ${c.hops.length} hops.` : ''),
+  url: c => {
+    if (!c.url) return 'This email has no link. The attack (if any) relies on the text alone.';
+    const lx = lexUrl(c.url);
+    return `The link is ${c.url}. URL risk ${c.urlRisk}/100, ${c.redirects != null ? `${c.redirects} redirect(s)` : 'redirects not followed'}, domain age ${c.domainAgeOf === 'url' && c.domainAge != null ? c.domainAge + ' days' : 'unknown'}.`
+      + (lx.ok && lx.reasons.length ? '\nFindings:\n' + lx.reasons.slice(0, 4).map(r => '• ' + r.t).join('\n') : '\nNo lexical red flags.')
+      + '\nDo not open it outside an isolated sandbox.';
+  },
+  attach: c => {
+    if (!c.attachment) return 'There is no attachment in this email.';
+    const comp = componentsOf(c).find(x => x.id === 'attachment');
+    return `Attachment ${c.attachment} (component score ${comp.score}, ${comp.status.toLowerCase()}). SHA-256 ${c.hash || 'unavailable'}, entropy ${c.entropy != null ? c.entropy.toFixed(2) : 'n/a'}/8.\n`
+      + comp.reasons.map(r => '• ' + r.t).join('\n') + '\nThe sandbox verdict is simulated and entropy is a signal, not proof. Never open it on a production host.';
+  },
+  infra: c => `Origin IP ${c.ip || 'unknown'}${c.asn ? `, ${c.asn}` : ''}${c.hosting ? `, ${c.hosting}` : ''}${c.country ? `, ${c.country}` : ''}. ASN, hosting and country enrichment are simulated, and geolocation is not attribution.`,
+  mitre: c => c.mitre ? `${c.mitre.id} ${c.mitre.name} (${c.mitre.tactic}).` + (c.related.length ? ' Related: ' + c.related.map(r => r.id + ' ' + r.name).join('; ') + '.' : '') : 'No MITRE ATT&CK technique is mapped: the message looks benign.',
+  hops: c => c.hops.length ? `${c.receivedCount || c.hops.length + 1} Received headers. Hop latencies: ${c.hops.map(h => h + ' ms').join(', ')}. Slowest: ${Math.max(...c.hops)} ms` + (Math.max(...c.hops) > 1000 ? ' (unusually slow relay, a weak signal).' : '.') : 'No hop timing could be derived from the Received headers.',
+  tokens: c => {
+    const cs = componentsOf(c), q = cs.filter(x => x.status === 'Quarantined');
+    return `The email was split into ${cs.length} component tokens. ` + (q.length ? `Quarantined: ${q.map(x => `${x.label} (${x.score})`).join(', ')}.` : 'None was quarantined.') + ' See the Tokens screen for every score.';
+  },
+  why: c => { const r = topReasons(c, 4); return r.length ? `Top evidence behind the ${c.risk}/100 score:\n` + r.map((x, i) => `${i + 1}. ${x.t} [${x.comp}]`).join('\n') : 'No meaningful risk signals were found, which is why the score is low.'; },
+  recs: c => 'Recommended:\n' + recommendations(c).map((r, i) => `${i + 1}. ${r}`).join('\n'),
+  ioc: c => { const l = iocsOf(c); return `${l.length} IOCs derived:\n` + l.map(i => `• ${i.type}: ${i.type === 'email' ? pii(c, i.value) : i.value}`).join('\n') + '\nExport them from the IOC Hub as JSON, CSV or STIX 2.1.'; },
+  risk: c => `Risk ${c.risk}/100 (${level(c.risk).label}), classified as ${c.classification}, with ${isDemo(c) ? `AI confidence ${c.confidence}% (demo data)` : `heuristic certainty ${c.confidence}%`}.` + (c.risk >= 40 ? ' Treat it as malicious: do not click, open or reply.' : ' It looks legitimate.'),
+  summary: c => narrative(c).slice(0, 3).join(' ') + '\nAsk "why", "keywords", "link" or "what should I do" for details.'
+};
+/* Simulated analyst: scores the question against every topic (typo tolerant),
+   answers the best match plus a second topic if the question covers two. */
 function answer(q, c){
-  const t = q.toLowerCase();
-  const has = re => re.test(t);
-  const fd = domainOf(c.from);
-  if (has(/\b(who|attribut\w*|actor|behind|apt|group)\b/))
-    return `I can't attribute this. TRACE-X only sees infrastructure: ${c.ip || 'no IP'}${c.country ? ` geolocated (simulated) to ${c.country}` : ''}. Hosting location is not attribution, and attackers routinely rent servers anywhere.`;
-  if (has(/\b(spf|dkim|dmarc|auth\w*|spoof\w*)\b/))
-    return `SPF ${authTxt(c.auth.spf)}, DKIM ${authTxt(c.auth.dkim)}, DMARC ${authTxt(c.auth.dmarc)} for ${fd || 'the sender'}. ${authFails(c) ? `${authFails(c)} check(s) did not pass.` : 'All pass, which shows the domain sent it but not that the domain is trustworthy.'}`;
-  if (has(/\b(reply|reply-to|sender|from)\b/))
-    return `From: ${pii(c, c.from) || 'unknown'}${c.fromName ? ` ("${c.fromName}")` : ''}. Reply-To: ${pii(c, c.replyTo) || 'none'}.${c.replyTo && domainOf(c.replyTo) !== fd ? ' The Reply-To domain differs, so replies go to someone else. That is a classic BEC / fraud pattern.' : ''}`;
-  if (has(/\b(url|link|links|redirect\w*|domain|https|click\w*)\b/))
-    return c.url ? `The link is ${c.url}. URL risk ${c.urlRisk}/100, ${c.redirects != null ? `${c.redirects} redirect(s)` : 'redirects not followed'}, domain age ${c.domainAgeOf === 'url' && c.domainAge != null ? c.domainAge + ' days' : 'unknown'}. Top finding: ${(lexUrl(c.url).reasons[0] || {t:'no lexical red flags'}).t}.`
-                 : 'This email has no URL. The attack (if any) relies on the text alone.';
-  if (has(/\b(attach\w*|file|hash|sha|entropy|sandbox|malware|payload|open it)\b/))
-    return c.attachment ? `Attachment ${c.attachment}, SHA-256 ${c.hash || 'unavailable'}, entropy ${c.entropy != null ? c.entropy.toFixed(2) : 'n/a'}/8. The sandbox verdict is simulated. Entropy is a signal, not proof. Never open it on a production host.`
-                        : 'There is no attachment in this email.';
-  if (has(/\b(ip|asn|country|hosting|host|infra\w*|geo\w*|where|server)\b/))
-    return `Origin IP ${c.ip || 'unknown'}${c.asn ? `, ${c.asn}` : ''}${c.hosting ? `, ${c.hosting}` : ''}${c.country ? `, ${c.country}` : ''}. ASN, hosting and country enrichment are simulated.`;
-  if (has(/\b(mitre|technique|att&ck|attack|tactic|ttp)\b/))
-    return c.mitre ? `${c.mitre.id} ${c.mitre.name} (${c.mitre.tactic}).${c.related.length ? ' Related: ' + c.related.map(r => r.id + ' ' + r.name).join('; ') + '.' : ''}` : 'No MITRE ATT&CK technique is mapped: the message looks benign.';
-  if (has(/\b(hop|hops|latency|received|delay)\b/))
-    return c.hops.length ? `${c.hops.length} hop latencies: ${c.hops.map(h => h + ' ms').join(', ')}. Slowest is ${Math.max(...c.hops)} ms.` : 'No hop timing could be derived from the Received headers.';
-  if (has(/\b(token\w*|component\w*|quarantin\w*|pii|mask)\b/)){
-    const q2 = componentsOf(c).filter(x => x.status === 'Quarantined');
-    return q2.length ? `Quarantined components: ${q2.map(x => `${x.label} (${x.score})`).join(', ')}. See the Tokens screen.` : 'No component was quarantined.';
-  }
-  if (has(/\b(why|explain|reason\w*|evidence)\b/)){
-    const r = topReasons(c, 3);
-    return r.length ? 'Top evidence:\n' + r.map((x, i) => `${i+1}. ${x.t} [${x.comp}]`).join('\n') : 'No meaningful risk signals were found.';
-  }
-  if (has(/\b(recommend\w*|next|action|respond|remediat\w*|should|do)\b/))
-    return 'Recommended:\n' + recommendations(c).map((r, i) => `${i+1}. ${r}`).join('\n');
-  if (has(/\b(ioc|iocs|indicator\w*|export|stix|csv|json)\b/))
-    return `${iocsOf(c).length} IOCs derived (${[...new Set(iocsOf(c).map(i => i.type))].join(', ')}). Export them from the IOC Hub as JSON, CSV or STIX 2.1.`;
-  if (has(/\b(risk|score|verdict|safe|phish\w*|legit\w*|danger\w*|confiden\w*|malicious)\b/))
-    return `Risk ${c.risk}/100 (${level(c.risk).label}), classified as ${c.classification}, with ${isDemo(c) ? `AI confidence ${c.confidence}% (demo data)` : `heuristic certainty ${c.confidence}%`}.`;
-  return 'I answer from this case\'s fields only. Try asking about: risk, SPF/DKIM/DMARC, the sender or Reply-To, the link, the attachment, the infrastructure, MITRE, hops, quarantine, why, or what to do.';
+  const hits = intentsOf(q);
+  if (!hits.length) return "I couldn't map that question to this case, so here's the short version:\n" + ANSWERS.summary(c);
+  const picked = [hits[0]];
+  // A second, distinct factual topic is answered too ("keywords and where is the server")
+  const second = hits.find(h => h.id !== hits[0].id && !['summary', 'greet', 'risk', 'why', 'attrib'].includes(h.id) && h.score >= 1);
+  if (second && hits[0].id !== 'greet') picked.push(second);
+  return picked.map(h => ANSWERS[h.id](c)).join('\n\n');
 }
 
 /* =====================================================================
@@ -691,7 +815,7 @@ function decodeWord(v){
 }
 function splitHead(text){
   const i = text.search(/\n\r?\n/);
-  return i < 0 ? [text, ''] : [text.slice(0, i), text.slice(i).replace(/^\r?\n\r?\n/, '')];
+  return i < 0 ? [text, ''] : [text.slice(0, i).replace(/\r$/, ''), text.slice(i).replace(/^\r?\n\r?\n/, '')];
 }
 function parseHeaders(raw){
   const hs = [];
@@ -735,6 +859,14 @@ async function parseEml(text, fileName){
 
   // MIME walk: decoded text for URL search + first attachment
   let searchable = body, att = null;
+  const texts = [];
+  const qp = v => { try { return decodeURIComponent(v.replace(/=\r?\n/g, '').replace(/%/g, '%25').replace(/=([0-9A-F]{2})/gi, '%$1')); } catch { return v.replace(/=\r?\n/g, ''); } };
+  const decodePart = (raw, ct, cte) => {
+    let t = raw;
+    if (cte.includes('base64')){ const b = bytesFromB64(raw); t = b ? new TextDecoder().decode(b) : ''; }
+    else if (cte.includes('quoted')) t = qp(raw);
+    texts.push({html:ct.includes('html'), t});
+  };
   const bounds = [...text.matchAll(/boundary="?([^";\r\n]+)"?/gi)].map(m => m[1]);
   for (const b of bounds){
     for (const part of text.split('--' + b)){
@@ -746,11 +878,17 @@ async function parseEml(text, fileName){
       if (fn && !att){
         const bytes = cte.includes('base64') ? bytesFromB64(pb.split(/\r?\n--/)[0]) : new TextEncoder().encode(pb);
         att = {name:decodeURIComponent(decodeWord(fn[1]).trim()), bytes};
-      } else if (ct.startsWith('text/') && cte.includes('base64')){
-        const b2 = bytesFromB64(pb); if (b2) searchable += '\n' + new TextDecoder().decode(b2);
+      } else if (ct.startsWith('text/')){
+        decodePart(pb.split(/\r?\n--/)[0], ct, cte);
+        if (cte.includes('base64')) searchable += '\n' + texts[texts.length - 1].t;
       }
     }
   }
+  if (!bounds.length) decodePart(body, (get('content-type') || 'text/plain').toLowerCase(), (get('content-transfer-encoding') || '').toLowerCase());
+  const strip = h => h.replace(/<(style|script)[\s\S]*?<\/\1>/gi, ' ').replace(/<br\s*\/?>|<\/p>|<\/div>/gi, '\n').replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  const plain = texts.find(x => !x.html), html = texts.find(x => x.html);
+  const bodyText = (plain ? plain.t : html ? strip(html.t) : '').replace(/[ \t]+/g, ' ').replace(/\n\s*\n\s*\n+/g, '\n\n').trim().slice(0, 4000);
   searchable = searchable.replace(/=\r?\n/g, '').replace(/=3D/gi, '=').replace(/&amp;/g, '&');
   const um = /https?:\/\/[^\s"'<>()\]]+/i.exec(searchable);
   const url = um ? um[0].replace(/[.,;]+$/, '') : null;
@@ -763,7 +901,7 @@ async function parseEml(text, fileName){
     auth, hops, receivedCount:rec.length, ip, asn:null, country:null, hosting:null,
     url, urlRisk:null, domainAge:null, domainAgeOf:null, redirectChain:url ? [url] : [], redirects:null,
     attachment:att ? att.name : null, entropy:att ? shannon(att.bytes) : null, hash:att && att.bytes ? await sha256(att.bytes) : null,
-    rawHeaders:headRaw.slice(0, 6000), related:[]
+    body:bodyText || null, rawHeaders:headRaw.slice(0, 6000), related:[]
   };
   if (url){ const lx = lexUrl(url); c.urlRisk = lx.ok ? lx.score : 50; }
   c.risk = 0;
@@ -1050,7 +1188,7 @@ VIEWS.infrastructure = c => {
 
 VIEWS.ai = c => {
   const chat = state.chat[c.id] || (state.chat[c.id] = [{who:'ai', text:`I'm a simulated, rule-based analyst. I answer only from the fields of "${c.name}". Ask me why it's risky, about authentication, the link, the attachment, or what to do.`}]);
-  const sugg = ['Why is this risky?', 'Did SPF/DKIM/DMARC pass?', 'Tell me about the link', 'Is the attachment malicious?', 'Where is the infrastructure?', 'Which MITRE technique?', 'What should I do?'];
+  const sugg = ['What suspicious keywords are in this mail?', 'Summarize this email', 'Why is this risky?', 'Did SPF/DKIM/DMARC pass?', 'Tell me about the link', 'Is the attachment malicious?', 'Where is the infrastructure?', 'Which MITRE technique?', 'What should I do?'];
   const comps = contributions(c, componentsOf(c)).sort((a, b) => b.points - a.points);
   return `${head('AI analysis', 'AI analysis', `${sourceChip(c)}${SIM('AI')}`)}
   <div class="grid g-hero">
@@ -1064,6 +1202,9 @@ VIEWS.ai = c => {
         <ul class="clean">${comps.filter(x => x.points > 0).map(x => `<li><div class="spread small"><span><b>${esc(x.label)}</b></span><span class="mono">+${x.points}</span></div>${bar(x.points / Math.max(1, c.risk) * 100, level(x.score).col)}<div class="small faint">${esc(x.reasons[0].t)}</div></li>`).join('') || '<li class="muted">No component contributes risk.</li>'}</ul></section>
     </div>
   </div>
+  ${c.body ? `<section class="card"><div class="spread"><h2>Suspicious language</h2><span class="small faint">${languageFindings(c).length} phrase(s) highlighted · ${isDemo(c) ? 'demo message' : 'parsed body'}</span></div>
+    <div class="row" style="margin-bottom:12px">${[...new Set(languageFindings(c).map(f => f.cat))].map(cat => `<span class="chip amber">${esc(cat)}</span>`).join('') || '<span class="chip green">No phishing-style wording</span>'}</div>
+    <div class="body-text">${highlightBody(c)}</div></section>` : ''}
   <section class="card"><div class="spread"><h2>Ask the case</h2>${SIM('AI CHAT')}</div>
     <div class="chat-log" id="chat-log" aria-live="polite">${chat.map(m => `<div class="msg ${m.who}">${esc(m.text)}</div>`).join('')}</div>
     <div class="row" style="margin:10px 0">${sugg.map(s => `<button class="chip" type="button" data-action="ask" data-q="${esc(s)}">${esc(s)}</button>`).join('')}</div>
