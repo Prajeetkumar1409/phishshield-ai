@@ -602,18 +602,78 @@ function graphOf(c){
   if (c.url) n.push({id:'url', type:'Target URL', ic:'URL', value:c.url});
   return n;
 }
+/* Where a string (e.g. the link) appears in the body, with surrounding text */
+function bodyContext(c, needle, span=110){
+  if (!c.body || !needle) return null;
+  const i = c.body.indexOf(needle);
+  if (i < 0) return null;
+  const a = Math.max(0, i - span), b = Math.min(c.body.length, i + needle.length + span);
+  return (a ? '…' : '') + c.body.slice(a, b).replace(/\s+/g, ' ').trim() + (b < c.body.length ? '…' : '');
+}
+/* Rich details for a selected infrastructure node: rows + extra evidence + source screen */
 function nodeDetail(c, id){
-  const fd = domainOf(c.from);
+  const fd = domainOf(c.from), mono = true;
+  const authLine = `SPF ${authTxt(c.auth.spf)} · DKIM ${authTxt(c.auth.dkim)} · DMARC ${authTxt(c.auth.dmarc)}`;
   switch (id){
-    case 'email': return [['Address', pii(c, c.from)], ['Display name', c.fromName || '-'], ['Reply-To', pii(c, c.replyTo) || 'none'], ['Auth', `SPF ${authTxt(c.auth.spf)} · DKIM ${authTxt(c.auth.dkim)} · DMARC ${authTxt(c.auth.dmarc)}`]];
-    case 'domain': return [['Domain', fd], ['Domain age', c.domainAgeOf === 'sender' && c.domainAge != null ? `${c.domainAge} days` : 'not queried for sender'], ['Signals', hostSignals(fd).map(r => r.t).join('; ') || 'No lexical red flags']];
-    case 'ip': return [['IP', c.ip], ['Range', /^(192\.0\.2|198\.51\.100|203\.0\.113)\./.test(c.ip) ? 'RFC 5737 documentation range (demo)' : 'Parsed from earliest external Received header'], ['Seen in', 'Received chain origin']];
-    case 'asn': return [['ASN', c.asn], ['Source', 'Simulated threat-intel enrichment']];
-    case 'country': return [['Country', c.country], ['Meaning', 'Where the server sits (simulated geolocation), not who operated it']];
-    case 'hosting': return [['Provider', c.hosting], ['Source', 'Simulated hosting lookup']];
-    case 'url': return [['URL', c.url], ['URL risk', c.urlRisk != null ? `${c.urlRisk}/100` : '-'], ['Domain age', c.domainAgeOf === 'url' && c.domainAge != null ? `${c.domainAge} days` : 'unknown'], ['Redirects', c.redirects != null ? c.redirects : 'not followed']];
+    case 'email': {
+      const mism = c.replyTo && domainOf(c.replyTo) !== fd;
+      return {route:'headers', label:'Headers', rows:[
+        ['Sender address', pii(c, c.from), mono], ['Display name', c.fromName || '-'], ['Sent to', pii(c, c.to) || '-', mono],
+        ['Reply-To', c.replyTo ? pii(c, c.replyTo) + (mism ? '  (different domain: replies are diverted)' : '') : 'none (replies go to the sender)'],
+        ['Subject', c.subject || '-'], ['Date', c.date || '-'], ['Authentication', authLine]],
+        extra: { title:'Sender findings', html: reasonList(componentsOf(c).find(x => x.id === 'sender').reasons) }};
+    }
+    case 'domain': {
+      const sig = hostSignals(fd), linkHost = c.url && hostOf(c.url);
+      return {route:'headers', label:'Headers', rows:[
+        ['Domain', fd, mono], ['Registered domain', regDomain(fd), mono],
+        ['Domain age', c.domainAgeOf === 'sender' && c.domainAge != null ? `${c.domainAge} days${c.domainAge < 30 ? ' (newly registered)' : ''}` : 'not looked up for the sender domain'],
+        ['Used in', 'From address' + (linkHost && regDomain(linkHost) === regDomain(fd) ? ' and the body link' : '')],
+        ['DMARC alignment', authTxt(c.auth.dmarc)]],
+        extra: { title:'Domain findings', html: reasonList(sig.length ? sig : [{w:0, t:'No look-alike or lexical red flags'}]) }};
+    }
+    case 'ip': return {route:'headers', label:'Headers', rows:[
+        ['IP address', c.ip, mono],
+        ['Range', /^(192\.0\.2|198\.51\.100|203\.0\.113)\./.test(c.ip) ? 'RFC 5737 documentation range (demo data)' : 'Parsed from the earliest external Received header'],
+        ['Role', 'Server that first handed this email to the internet'],
+        ['Received headers', String(c.receivedCount || c.hops.length + 1)],
+        ['Hop latencies', c.hops.length ? c.hops.map(h => h + ' ms').join(' · ') : 'not available'],
+        ['Network', [...new Set([c.asn, c.hosting, c.country].filter(Boolean))].join(' · ') || 'no enrichment']]};
+    case 'asn': return {rows:[['ASN', c.asn, mono], ['Announces', `origin IP ${c.ip}`, mono], ['Hosting', c.hosting || '-'], ['Source', 'Simulated threat-intel enrichment']]};
+    case 'country': return {rows:[['Country', c.country], ['Applies to', `origin IP ${c.ip}`, mono], ['Meaning', 'Where the sending server sits (simulated geolocation). This is not who operated it: attackers rent servers anywhere.']]};
+    case 'hosting': return {rows:[['Provider', c.hosting], ['Hosts', `origin IP ${c.ip} (${c.asn || 'ASN unknown'})`], ['Source', 'Simulated hosting lookup']]};
+    case 'url': {
+      const lx = lexUrl(c.url), ctx = bodyContext(c, c.url);
+      const chain = c.redirectChain || [];
+      return {route:'urls', label:'URLs', rows:[
+        ['URL', c.url, mono], ['Host', hostOf(c.url), mono], ['URL risk', c.urlRisk != null ? `${c.urlRisk}/100 (${level(c.urlRisk).label})` : '-'],
+        ['Domain age', c.domainAgeOf === 'url' && c.domainAge != null ? `${c.domainAge} days${c.domainAge < 30 ? ' (newly registered)' : ''}` : 'unknown (WHOIS not queried)'],
+        ['HTTPS', /^https:/i.test(c.url) ? 'Yes. Encrypted, but that does not make it safe' : 'No. Unencrypted HTTP'],
+        ['Redirects', c.redirects != null ? String(c.redirects) : 'not followed (static parse)'],
+        ['Final landing page', chain.length > 1 ? chain[chain.length - 1] : 'not followed', mono],
+        ['Found in email', `"${c.subject || '(no subject)'}" from ${pii(c, c.from) || 'unknown sender'}`]],
+        extra: { title:'Link evidence', html:
+          (ctx ? `<p class="small muted" style="margin-bottom:6px">Where it appears in the message:</p><div class="body-text" style="max-height:none">${highlightBody({...c, body:ctx})}</div>` : '')
+          + `<p class="small muted" style="margin:12px 0 6px">Findings:</p>${reasonList(lx.ok && lx.reasons.length ? lx.reasons : [{w:0, t:'No lexical red flags'}])}`
+          + (chain.length > 1 ? `<p class="small muted" style="margin:12px 0 6px">Redirect chain:</p><ol class="clean">${chain.map((u, i) => `<li class="reason"><span class="w">${i === 0 ? 'email' : i === chain.length - 1 ? 'land' : '→ ' + i}</span><span class="mono">${esc(u)}</span></li>`).join('')}</ol>` : '') }};
+    }
   }
-  return [];
+  return {rows:[]};
+}
+/* "About this email" card: what the mail is, shown next to any node */
+function emailContextCard(c){
+  const L = level(c.risk), lf = languageFindings(c);
+  return `<section class="card"><div class="spread"><h2>About this email</h2>${riskChip(c.risk)}</div>
+    <div class="row" style="margin-bottom:14px"><span class="chip">${esc(c.classification)}</span>${c.mitre ? `<span class="chip pink">${esc(c.mitre.id)} · ${esc(c.mitre.name)}</span>` : ''}${sourceChip(c)}</div>
+    <dl class="kv"><dt>Subject</dt><dd><b>${esc(c.subject || '(none)')}</b></dd>
+      <dt>From</dt><dd class="mono">${esc(pii(c, c.from) || '-')}${c.fromName ? ` <span class="faint">(${esc(c.fromName)})</span>` : ''}</dd>
+      <dt>To</dt><dd class="mono">${esc(pii(c, c.to) || '-')}</dd><dt>Date</dt><dd>${esc(c.date || '-')}</dd>
+      ${c.replyTo ? `<dt>Reply-To</dt><dd class="mono">${esc(pii(c, c.replyTo))}</dd>` : ''}
+      <dt>Link</dt><dd class="mono">${esc(c.url || 'none')}</dd>
+      <dt>Attachment</dt><dd class="mono">${esc(c.attachment || 'none')}</dd></dl>
+    <p class="small" style="margin:14px 0 6px"><b>What it's about:</b> ${esc(narrative(c)[0])}</p>
+    ${c.body ? `<p class="small muted" style="margin:10px 0 6px">Message${lf.length ? ` (${lf.length} suspicious phrase${lf.length > 1 ? 's' : ''} highlighted)` : ''}:</p><div class="body-text" style="max-height:220px">${highlightBody(c)}</div>` : ''}
+    <div class="row" style="margin-top:14px">${goBtn('overview', 'Overview')}${goBtn('ai', 'AI analysis')}${goBtn('report', 'Report')}</div></section>`;
 }
 function recommendations(c){
   const L = level(c.risk), r = [];
@@ -1297,12 +1357,16 @@ VIEWS.infrastructure = c => {
       <text class="val" x="${n.x}" y="${n.y < 150 ? n.y - 42 : n.y + 48}" text-anchor="middle">${esc(trunc(n.id === 'email' ? pii(c, n.value) : n.value))}</text></g>`).join('')}
   </svg>`;
   const sel = pos[selIdx];
-  const panel = sel ? `<section class="card"><div class="spread"><div><p class="eyebrow">Node ${selIdx + 1} of ${N}</p><h2>${esc(sel.type)}</h2></div>
+  const d = sel ? nodeDetail(c, sel.id) : null;
+  const nodeCard = sel ? `<section class="card"><div class="spread"><div><p class="eyebrow">Node ${selIdx + 1} of ${N}</p><h2>${esc(sel.type)}</h2></div>
       <div class="row"><button class="btn sm" type="button" data-action="node-step" data-dir="-1" ${selIdx === 0 ? 'disabled' : ''}>← Back</button>
       <button class="btn sm" type="button" data-action="node-step" data-dir="1" ${selIdx === N - 1 ? 'disabled' : ''}>Next →</button>
       <button class="btn sm primary" type="button" data-action="node-ioc">Show in IOC Hub</button></div></div>
-      <dl class="kv">${nodeDetail(c, sel.id).map(([k, v]) => `<dt>${esc(k)}</dt><dd class="${k === 'URL' || k === 'Address' || k === 'IP' || k === 'Domain' ? 'mono' : ''}">${esc(v)}</dd>`).join('')}</dl></section>`
-    : `<section class="card"><p class="muted">Select a node (click, or Tab then Enter) to inspect it.</p></section>`;
+      <dl class="kv">${d.rows.map(([k, v, m]) => `<dt>${esc(k)}</dt><dd class="${m ? 'mono' : ''}">${esc(v)}</dd>`).join('')}</dl>
+      ${d.extra ? `<h3 style="margin:18px 0 10px">${esc(d.extra.title)}</h3>${d.extra.html}` : ''}
+      ${d.route ? `<div class="row" style="margin-top:16px">${goBtn(d.route, 'Open ' + d.label)}</div>` : ''}</section>`
+    : `<section class="card"><h2>Node details</h2><p class="muted">Select a node in the graph (click, or Tab then Enter) to inspect it. The email it belongs to is summarised alongside.</p></section>`;
+  const panel = `<div class="grid g2" style="align-items:start">${nodeCard}${emailContextCard(c)}</div>`;
   return `${head('Infrastructure', 'Infrastructure graph', sourceChip(c))}
   <section class="card"><div class="spread"><span class="badge-attr">INFRASTRUCTURE GEOLOCATION — NOT ATTRIBUTION</span><span class="row">${SIM('GEOLOCATION')}${SIM('THREAT INTEL')}</span></div>
     <div class="graph-wrap">${svg}</div>
