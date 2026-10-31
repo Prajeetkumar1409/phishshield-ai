@@ -11,6 +11,8 @@ const config = {
   corsOrigin: process.env.CORS_ORIGIN || '*',
   storageFile: process.env.STORAGE_FILE || path.join(root, 'storage', 'scans.json'),
   maxHistory: Number(process.env.MAX_HISTORY) || 500,
+  // Corpus-trained NLP model exported by ml/train.py; falls back to the built-in corpus if missing
+  textModelFile: process.env.TEXT_MODEL_FILE || path.join(root, 'models', 'text-model.json'),
   maxContentLength: 20000,
   rateLimit: {
     windowMs: 60 * 1000,
