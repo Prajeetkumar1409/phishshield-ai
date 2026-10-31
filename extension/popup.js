@@ -1,4 +1,4 @@
-const DEFAULT_SERVER = 'http://localhost:5000';
+const DEFAULT_SERVER = 'https://phishshield-ai-scsa.onrender.com';
 const $ = (id) => document.getElementById(id);
 
 async function getServer() {

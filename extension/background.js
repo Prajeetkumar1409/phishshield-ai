@@ -1,4 +1,4 @@
-const DEFAULT_SERVER = 'http://localhost:5000';
+const DEFAULT_SERVER = 'https://phishshield-ai-scsa.onrender.com';
 
 const getServer = async () => (await chrome.storage.sync.get({ server: DEFAULT_SERVER })).server.replace(/\/$/, '');
 

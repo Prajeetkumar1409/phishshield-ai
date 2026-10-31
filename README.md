@@ -1,5 +1,7 @@
 # 🛡️ PhishShield AI — Phishing & Scam Detection
 
+🔗 **Live demo:** https://phishshield-ai-scsa.onrender.com
+
 PhishShield AI analyses **emails, SMS, URLs and chat messages** and flags phishing attempts, suspicious links, impersonation and social-engineering patterns. Every verdict is explainable: it comes with highlighted evidence, per-engine scores and recommended next steps.
 
 It ships as a **web app** (React + Express) plus a **Chrome extension**. All models are trained in-house at server start-up; no third-party AI APIs are called, and messages never leave the server.
@@ -110,7 +112,7 @@ Deploy `server/` to Render, then deploy `client/` to Vercel with the env var `VI
 ## 🧩 Chrome extension
 1. Open `chrome://extensions` and enable **Developer mode**.
 2. Click **Load unpacked** and select the `extension/` folder.
-3. Open the popup → ⚙ → set your server URL (e.g. your Render URL).
+3. It uses the live server by default; to use a local one, open the popup → ⚙ → `http://localhost:5000`.
 
 ## ⚙️ Environment variables (server)
 
