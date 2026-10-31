@@ -13,7 +13,11 @@ const Learn = lazy(() => import('./pages/Learn'));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
-  useEffect(() => window.scrollTo({ top: 0 }), [pathname]);
+  // Braces matter: newer browsers return a Promise from scrollTo, and React
+  // would treat a returned value as the effect cleanup and crash on navigation.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [pathname]);
   return null;
 }
 
