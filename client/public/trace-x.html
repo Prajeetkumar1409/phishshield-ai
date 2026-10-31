@@ -38,7 +38,8 @@ h1,h2,h3,h4{margin:0;line-height:1.25;letter-spacing:-.01em}
 h1{font-size:26px;font-weight:800} h2{font-size:18px;font-weight:700} h3{font-size:15px;font-weight:700}
 p{margin:0}
 a{color:var(--blue)}
-.mono{font-family:var(--mono);font-size:13px;word-break:break-all}
+.mono{font-family:var(--mono);font-size:13px;overflow-wrap:anywhere}
+td.nowrap{white-space:nowrap}
 .muted{color:var(--muted)} .faint{color:var(--faint)} .small{font-size:13px}
 :focus-visible{outline:3px solid var(--blue);outline-offset:2px;border-radius:10px}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -104,7 +105,7 @@ button.chip[aria-pressed="true"]{background:var(--blue);color:#fff;border-color:
 .kv dt{color:var(--muted);font-weight:600} .kv dd{margin:0;min-width:0;word-break:break-word}
 .empty{text-align:center;padding:40px 20px;color:var(--muted)}
 .empty b{display:block;color:var(--ink);font-size:17px;margin-bottom:6px}
-.note{display:flex;gap:10px;padding:12px 14px;border-radius:16px;background:var(--card2);font-size:13px;color:var(--muted);border:1px solid var(--line)}
+.note{display:block;padding:12px 14px;border-radius:16px;background:var(--card2);font-size:13px;color:var(--muted);border:1px solid var(--line)}
 .note.warn{background:var(--amber-soft);color:var(--amber);border-color:transparent}
 .note.bad{background:var(--red-soft);color:var(--red);border-color:transparent}
 .note b{color:inherit}
@@ -141,9 +142,10 @@ tr:last-child td{border-bottom:none}
 .banner.med{background:linear-gradient(120deg,#B86E00,#E89A1B)}
 .banner.low{background:linear-gradient(120deg,#0B8F63,#2FB487)}
 .banner .score{font-size:30px;font-weight:800}
+.banner .txt{flex:1 1 320px;min-width:0}
 .banner .btn{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.35);color:#fff}
 .banner .btn:hover{background:rgba(255,255,255,.3)}
-.banner .x{margin-left:auto}
+.banner .x{margin-left:0}
 
 /* graph */
 .badge-attr{display:inline-block;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.04em;padding:6px 12px;border-radius:999px;background:var(--pink-soft);color:var(--pink);border:1px solid var(--pink)}
@@ -176,6 +178,8 @@ pre.preview{margin:0;max-height:360px;overflow:auto;background:var(--card2);bord
 .report-sec{break-inside:avoid}
 .report-sec h2{display:flex;gap:10px;align-items:center}
 .report-sec h2 .n{font-family:var(--mono);font-size:13px;color:var(--pink)}
+#pipeline:empty,#banner:empty{display:none}
+.page-head .chip{white-space:normal;text-align:left}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:600;font-size:14px;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
 
@@ -185,12 +189,14 @@ pre.preview{margin:0;max-height:360px;overflow:auto;background:var(--card2);bord
   .sidebar{position:static;height:auto;flex-direction:row;align-items:center;overflow-x:auto;padding:12px 16px;border-right:none;border-bottom:1px solid var(--line)}
   .nav{flex-direction:row}
   .side-note{display:none}
+  .brand{flex:none}.brand small{display:none}.brand b{white-space:nowrap}
   .topbar{padding:12px 16px}
   .content{padding:18px 16px 48px}
   .g2,.g3,.g-hero{grid-template-columns:1fr}
   .pipeline{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
-@media (max-width:560px){.g4{grid-template-columns:1fr}.ioc{grid-template-columns:1fr}.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
+@media (max-width:700px){.hide-sm{display:none}}
+@media (max-width:560px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.metric .v{font-size:26px}.ioc{grid-template-columns:1fr}.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
 @media print{
   .sidebar,.topbar,.noprint,#pipeline,#banner{display:none!important}
   .app{display:block} body{background:#fff}
@@ -523,7 +529,7 @@ function contributions(c, comps){
 }
 function topReasons(c, n=5){
   return componentsOf(c).flatMap(x => x.reasons.filter(r => r.w > 0).map(r => ({...r, comp:x.label, route:x.route})))
-    .sort((a,b) => b.w - a.w).slice(0, n);
+    .sort((a,b) => b.w - a.w).filter((r, i, arr) => arr.findIndex(x => x.t === r.t) === i).slice(0, n);
 }
 
 /* =====================================================================
@@ -805,7 +811,7 @@ function sandboxPolicy(){
   return `<section class="card">
     <div class="spread"><h2>Quarantine sandbox: isolation policy</h2>${SIM('SANDBOX')}</div>
     <p class="muted small" style="margin-bottom:14px">Quarantined components are meant to be detonated in a disposable analysis VM. A VM is <b>not 100% isolation</b>: shared folders, clipboard sharing and network connections can carry risk back to the host. TRACE-X does not run a real sandbox; this is the policy such a sandbox should enforce.</p>
-    <div class="grid g3">${items.map(([t, d], i) => `<div class="note"><b style="color:var(--blue)">${i+1}</b><div><b style="color:var(--ink)">${t}</b><br>${d}</div></div>`).join('')}</div>
+    <div class="grid g3">${items.map(([t, d], i) => `<div class="note" style="display:flex;gap:10px"><b style="color:var(--blue)">${i+1}</b><div><b style="color:var(--ink)">${t}</b><br>${d}</div></div>`).join('')}</div>
   </section>`;
 }
 function linkCheckCard(){
@@ -858,13 +864,13 @@ VIEWS.dashboard = () => {
   <section class="card">
     <div class="spread"><h2>Case queue</h2><span class="small muted">Select a case to open it in Overview and re-run the pipeline</span></div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Case</th><th>Sender</th><th>Risk</th><th>Classification</th><th>Auth</th><th></th></tr></thead>
+      <thead><tr><th>Case</th><th class="hide-sm">Sender</th><th>Risk</th><th class="hide-sm">Classification</th><th class="hide-sm">Auth</th><th></th></tr></thead>
       <tbody>${cs.map(c => `<tr class="click" data-action="open-case" data-id="${esc(c.id)}">
         <td><b>${esc(c.name)}</b><div class="faint small">${isDemo(c) ? 'Demo data' : 'Parsed .eml'}${c.id === state.activeId ? ' · active' : ''}</div></td>
-        <td class="mono">${esc(pii(c, c.from) || '-')}</td>
+        <td class="mono nowrap hide-sm">${esc(pii(c, c.from) || '-')}</td>
         <td>${riskChip(c.risk)}<div style="margin-top:6px">${bar(c.risk, level(c.risk).col)}</div></td>
-        <td>${esc(c.classification)}</td>
-        <td class="small">${authFails(c) ? `<span class="chip red">${authFails(c)} not passing</span>` : '<span class="chip green">All pass</span>'}</td>
+        <td class="hide-sm">${esc(c.classification)}</td>
+        <td class="small hide-sm">${authFails(c) ? `<span class="chip red">${authFails(c)} not passing</span>` : '<span class="chip green">All pass</span>'}</td>
         <td><button class="btn sm" type="button" data-action="open-case" data-id="${esc(c.id)}">Open</button></td></tr>`).join('')}</tbody>
     </table></div>
   </section>
@@ -1015,18 +1021,18 @@ VIEWS.ioc = c => {
 VIEWS.infrastructure = c => {
   const nodes = graphOf(c);
   if (state.selectedNode && !nodes.some(n => n.id === state.selectedNode)) state.selectedNode = null;
-  const W = 1000, H = 250, N = nodes.length;
-  const pos = nodes.map((n, i) => ({...n, x: N === 1 ? W / 2 : 70 + i * (W - 140) / (N - 1), y: i % 2 ? 160 : 80}));
+  const W = 1000, H = 300, N = nodes.length;
+  const pos = nodes.map((n, i) => ({...n, x: N === 1 ? W / 2 : 110 + i * (W - 220) / (N - 1), y: i % 2 ? 190 : 110}));
   const selIdx = pos.findIndex(n => n.id === state.selectedNode);
-  const trunc = s => s.length > 22 ? s.slice(0, 21) + '…' : s;
+  const trunc = s => s.length > 24 ? s.slice(0, 23) + '…' : s;
   const svg = `<svg class="graph" viewBox="0 0 ${W} ${H}" role="group" aria-label="Infrastructure graph">
     ${pos.slice(1).map((n, i) => `<line class="edge ${selIdx >= 0 && (i === selIdx || i + 1 === selIdx) ? 'hot' : ''}" x1="${pos[i].x}" y1="${pos[i].y}" x2="${n.x}" y2="${n.y}"/>`).join('')}
     ${pos.map(n => `<g class="node ${n.id === state.selectedNode ? 'sel' : ''}" tabindex="0" role="button" aria-pressed="${n.id === state.selectedNode}" aria-label="${esc(n.type)}: ${esc(n.id === 'email' ? pii(c, n.value) : n.value)}" data-action="node" data-node="${n.id}">
       <title>${esc(n.value)}</title>
       <circle cx="${n.x}" cy="${n.y}" r="28"/>
       <text class="ic" x="${n.x}" y="${n.y + 4.5}" text-anchor="middle">${n.ic}</text>
-      <text class="lbl" x="${n.x}" y="${n.y < 120 ? n.y - 40 : n.y + 50}" text-anchor="middle">${esc(n.type)}</text>
-      <text class="val" x="${n.x}" y="${n.y < 120 ? n.y + 50 : n.y - 40}" text-anchor="middle">${esc(trunc(n.id === 'email' ? pii(c, n.value) : n.value))}</text></g>`).join('')}
+      <text class="lbl" x="${n.x}" y="${n.y < 150 ? n.y - 62 : n.y + 68}" text-anchor="middle">${esc(n.type)}</text>
+      <text class="val" x="${n.x}" y="${n.y < 150 ? n.y - 42 : n.y + 48}" text-anchor="middle">${esc(trunc(n.id === 'email' ? pii(c, n.value) : n.value))}</text></g>`).join('')}
   </svg>`;
   const sel = pos[selIdx];
   const panel = sel ? `<section class="card"><div class="spread"><div><p class="eyebrow">Node ${selIdx + 1} of ${N}</p><h2>${esc(sel.type)}</h2></div>
@@ -1096,7 +1102,7 @@ function renderNav(){
 }
 function renderPipeline(){
   const p = state.pipeline;
-  if (p.stage < 0){ $('#pipeline').innerHTML = ''; return; }
+  if (p.stage < 0 || !p.running){ $('#pipeline').innerHTML = ''; return; }
   $('#pipeline').innerHTML = `<div class="pipeline" aria-label="Analysis pipeline">${STAGES.map((s, i) => {
     const st = !p.running || i < p.stage ? 'done' : i === p.stage ? 'active' : '';
     return `<div class="stage ${st}">${s.n}<small>${st === 'done' ? '✓ done' : st === 'active' ? 'running' : 'queued'}${s.sim ? ' · sim' : ''}</small></div>`; }).join('')}</div>`;
@@ -1105,7 +1111,7 @@ function renderBanner(){
   const c = activeCase();
   if (!state.banner){ $('#banner').innerHTML = ''; return; }
   const L = level(c.risk), r = topReasons(c, 2);
-  $('#banner').innerHTML = `<div class="banner ${L.k}"><span class="score">${c.risk}</span><div><b>${L.label}: ${esc(c.classification)}</b><div class="small" style="opacity:.92">${r.length ? esc(r.map(x => x.t).join(' · ')) : 'No significant risk signals'}${isDemo(c) ? ' · demo data' : ''}</div></div>
+  $('#banner').innerHTML = `<div class="banner ${L.k}"><span class="score">${c.risk}</span><div class="txt"><b>${L.label}: ${esc(c.classification)}</b><div class="small" style="opacity:.92">${r.length ? esc(r.map(x => x.t).join(' · ')) : 'No significant risk signals'}${isDemo(c) ? ' · demo data' : ''}</div></div>
     <button class="btn sm" type="button" data-action="go" data-route="ai">Open AI Analysis →</button>
     <button class="btn sm x" type="button" data-action="banner-close" aria-label="Dismiss risk banner">✕</button></div>`;
 }
