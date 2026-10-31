@@ -21,6 +21,18 @@ It ships as a **web app** (React + Express) plus a **Chrome extension**. All mod
 | 📊 **Dashboard** | KPIs, 14-day timeline, verdict mix, channels, top indicators, scan history |
 | 🧩 **Extension** | Scans the current tab, plus right-click "scan selected text / link" |
 
+## 🔬 TRACE-X: email forensics workspace
+
+`/trace-x.html` ([client/public/trace-x.html](client/public/trace-x.html)) is a self-contained SOC-style forensics view (no framework, no build step, no localStorage). It also opens directly from disk.
+
+- **Four preset cases** (M365 credential phish, LockBit dropper, executive BEC, legitimate newsletter) built on documentation IPs/ASNs. Their numbers are labelled **demo data**.
+- **Upload .EML.** The parser really extracts From, Reply-To mismatch, Subject, Authentication-Results, Received count/origin IP/hop timing, the first URL, and the attachment filename with real SHA-256 and Shannon entropy. It then scores the message heuristically.
+- **Token-based analysis.** Each email component (sender, Reply-To, recipient, subject, auth, delivery path, link, attachment) is scored on its own. Components at ≥ 60 are quarantined, and the scores fuse with a weighted noisy-OR into the final risk. A **Mask PII** toggle tokenizes sender/receiver addresses.
+- **Safe link check.** Analyses an unknown URL lexically without ever opening it, and also asks the PhishShield `/api/v1/analyze` URL engine when the API is reachable.
+- **Explainable verdicts.** Every score is broken down into evidence and per-component points.
+- **Screens:** Overview, Headers, URLs, Attachments, IOC Hub (JSON / CSV / STIX 2.1 export), infrastructure graph, AI analysis with MITRE mapping and chat, and a printable 10-section report.
+- **Simulated parts:** sandbox detonation, threat-intel enrichment, geolocation and the AI chat. They are labelled as such in the UI. The sandbox screen documents the isolation policy a real analysis VM should enforce: no shared folders or clipboard, an isolated network, internet off by default, snapshots, nothing executed on the host, and a dedicated restricted VM.
+
 ## 🏗️ Architecture
 
 ```

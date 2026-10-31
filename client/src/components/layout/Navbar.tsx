@@ -52,6 +52,9 @@ export default function Navbar() {
               )}
             </NavLink>
           ))}
+          <a href="/trace-x.html" className="rounded-full px-4 py-1.5 text-sm font-medium text-slate-400 transition-colors hover:text-white">
+            TRACE-X
+          </a>
         </div>
 
         <div className="flex items-center gap-2">
@@ -83,6 +86,9 @@ export default function Navbar() {
                   {l.label}
                 </NavLink>
               ))}
+              <a href="/trace-x.html" className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400">
+                TRACE-X forensics
+              </a>
             </div>
           </motion.div>
         )}
