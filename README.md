@@ -77,6 +77,17 @@ Production mode (one process serves both the API and the built UI):
 npm run build && npm start   # → http://localhost:5000
 ```
 
+### Retrain the NLP model on real email corpora
+
+`ml/train.py` trains the text classifier on the **Nazario** phishing corpus (mbox) and **Enron** maildir (balanced), with a 70/15/15 split, C tuned on validation and final metrics on the held-out test set. It exports `server/models/text-model.json`, which the API loads at start-up. If that file is missing, the API falls back to the built-in corpus.
+
+```bash
+pip install -r ml/requirements.txt
+python ml/train.py --nazario data/nazario --enron data/enron_maildir
+```
+
+The script reimplements the JS tokenizer and TF-IDF in Python, so if you change `server/src/engines/text/tokenizer.js`, update `ml/train.py` to match and retrain.
+
 Tests (unit + API integration):
 
 ```bash

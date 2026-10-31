@@ -24,6 +24,15 @@ export class TfidfVectorizer {
     return this;
   }
 
+  /** Rebuild from an exported vocabulary (e.g. the scikit-learn model from ml/train.py). */
+  static fromJSON({ terms, idf }) {
+    const v = new TfidfVectorizer();
+    v.terms = terms;
+    v.idf = idf;
+    terms.forEach((t, i) => v.vocab.set(t, i));
+    return v;
+  }
+
   transform(text) {
     const counts = new Map();
     for (const tok of tokenize(text)) {

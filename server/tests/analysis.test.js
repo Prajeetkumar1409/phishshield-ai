@@ -4,6 +4,8 @@ import { analyze } from '../src/services/analysis.service.js';
 import { urlClassifier } from '../src/engines/url/urlClassifier.js';
 import { IsolationForest } from '../src/engines/ml/isolationForest.js';
 import { extractUrls } from '../src/engines/url/urlParser.js';
+import { TfidfVectorizer } from '../src/engines/text/tfidf.js';
+import { LogisticRegression } from '../src/engines/ml/logisticRegression.js';
 
 const run = (type, content, extra = {}) => analyze({ type, content, ...extra });
 
@@ -61,4 +63,12 @@ test('isolation forest scores outliers higher than inliers', () => {
   const data = Array.from({ length: 100 }, (_, i) => [i % 10, (i * 7) % 10]);
   const f = new IsolationForest({ seed: 1 }).fit(data);
   assert.ok(f.score([500, 500]) > f.score([5, 5]));
+});
+
+test('exported TF-IDF + logistic regression weights round-trip through fromJSON', () => {
+  const vec = TfidfVectorizer.fromJSON({ terms: ['verifi', 'lunch'], idf: [1, 1] });
+  const model = LogisticRegression.fromJSON({ weights: [3, -3], bias: 0 });
+  assert.ok(model.predictProba(vec.transform('Account verified?')) > 0.9);
+  assert.ok(model.predictProba(vec.transform('lunch tomorrow?')) < 0.1);
+  assert.equal(vec.transform('nothing known').size, 0);
 });
