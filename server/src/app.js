@@ -24,8 +24,14 @@ export function createApp() {
 
   // Single-service deployment: serve the built React app when it exists.
   if (fs.existsSync(path.join(config.clientDist, 'index.html'))) {
-    app.use(express.static(config.clientDist, { maxAge: '1h', index: false }));
-    app.get('*', (req, res) => res.sendFile(path.join(config.clientDist, 'index.html')));
+    // Hashed assets are immutable; HTML pages must revalidate so a deploy shows up on the next load.
+    app.use(express.static(config.clientDist, {
+      index: false,
+      setHeaders: (res, file) => res.setHeader('Cache-Control', file.endsWith('.html')
+        ? 'no-cache'
+        : file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=31536000, immutable' : 'public, max-age=3600'),
+    }));
+    app.get('*', (req, res) => res.sendFile(path.join(config.clientDist, 'index.html'), { headers: { 'Cache-Control': 'no-cache' } }));
   } else {
     app.get('/', (req, res) => res.json({ name: 'PhishShield AI API', docs: '/api/v1/health' }));
   }

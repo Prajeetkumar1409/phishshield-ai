@@ -787,10 +787,134 @@ const ANSWERS = {
   risk: c => `Risk ${c.risk}/100 (${level(c.risk).label}), classified as ${c.classification}, with ${isDemo(c) ? `AI confidence ${c.confidence}% (demo data)` : `heuristic certainty ${c.confidence}%`}.` + (c.risk >= 40 ? ' Treat it as malicious: do not click, open or reply.' : ' It looks legitimate.'),
   summary: c => narrative(c).slice(0, 3).join(' ') + '\nAsk "why", "keywords", "link" or "what should I do" for details.'
 };
+/* Definitions for "what is / what is meant by / explain X" questions.
+   Each entry gives a plain definition plus what it means for the active case. */
+const GLOSSARY = [
+  {keys:['malicious mail','malicious email','malicious message','malicious e-mail','bad email','harmful email','malicious'], term:'Malicious email',
+   def:'A malicious email is a message sent to harm the person who receives it. Usually it tries to steal a password (phishing), install malware such as ransomware through an attachment or link, or trick someone into sending money (business email compromise). It typically combines a disguised sender, pressure wording and a harmful link, attachment or request.',
+   here: c => c.risk >= 40 ? `This email scores ${c.risk}/100 and is classified as ${c.classification}. Main reasons: ${topReasons(c, 3).map(r => r.t).join('; ')}.` : `This email scores only ${c.risk}/100 (${c.classification}), so it is not considered malicious.`},
+  {keys:['phishing','phish'], term:'Phishing',
+   def:'Phishing is an email (or SMS/chat message) that pretends to come from someone trusted so the reader clicks a link, opens a file or hands over credentials or money.',
+   here: c => `This case is classified as ${c.classification} (${c.risk}/100).`},
+  {keys:['credential phishing','credential theft','credential harvesting'], term:'Credential phishing',
+   def:'Credential phishing tries to steal usernames and passwords, usually by linking to a fake login page that copies a real one (for example Microsoft 365).',
+   here: c => c.url ? `The link here goes to ${hostOf(c.url)} (URL risk ${c.urlRisk}/100).` : 'This email has no link, so it is not a credential-phishing attempt by link.'},
+  {keys:['spear phishing','spearphishing'], term:'Spear phishing',
+   def:'Spear phishing is phishing aimed at a specific person or team, written to look relevant to their job.',
+   here: c => `It was sent to ${pii(c, c.to) || 'an unknown recipient'}.`},
+  {keys:['bec','business email compromise','wire fraud','ceo fraud'], term:'Business email compromise (BEC)',
+   def:'BEC is fraud where an attacker poses as an executive, colleague or supplier and asks for a payment or sensitive data. It often has no link or attachment, only persuasive text and a Reply-To that diverts the answer.',
+   here: c => /BEC|wire/i.test(c.classification + c.name) ? 'This case is a BEC attempt: urgent, confidential wire-transfer request with a diverted Reply-To.' : 'This case is not classified as BEC.'},
+  {keys:['ransomware','lockbit'], term:'Ransomware',
+   def:'Ransomware is malware that encrypts files and demands payment to unlock them. LockBit is one well-known ransomware family; email attachments and links are a common way it is delivered.',
+   here: c => /ransom/i.test(c.classification) ? `This case is a ransomware dropper: ${c.attachment} (entropy ${c.entropy}/8) is held in quarantine.` : 'This case is not ransomware-related.'},
+  {keys:['malware','dropper','payload','virus','trojan'], term:'Malware / dropper',
+   def:'Malware is software built to cause harm. A dropper is a small first-stage file (often an ISO, script or macro document) whose only job is to download or install the real malware.',
+   here: c => c.attachment ? `Attachment: ${c.attachment}, entropy ${c.entropy != null ? c.entropy.toFixed(2) : 'n/a'}/8.` : 'This email has no attachment.'},
+  {keys:['spoofing','spoof','spoofed','impersonation','impersonate'], term:'Spoofing / impersonation',
+   def:'Spoofing means faking who an email comes from: forging the From address, or registering a similar-looking domain and display name.',
+   here: c => `From: ${pii(c, c.from) || 'unknown'}${c.fromName ? ` ("${c.fromName}")` : ''}. ${hostSignals(domainOf(c.from) || '').map(r => r.t).join('; ') || 'No look-alike signals in the sender domain.'}`},
+  {keys:['look-alike domain','lookalike domain','lookalike','look-alike','typosquatting','typosquat','homoglyph'], term:'Look-alike domain',
+   def:'A look-alike (typosquatting) domain imitates a real one by swapping characters (micros0ft with a zero), adding words (secure-login) or using look-alike Unicode letters.',
+   here: c => { const r = [domainOf(c.from), c.url && hostOf(c.url)].filter(Boolean).flatMap(h => hostSignals(h)).filter(x => /look-alike|brand/i.test(x.t)); return r.length ? r.map(x => x.t).join('; ') + '.' : 'No look-alike domains in this case.'; }},
+  {keys:['spf','sender policy framework'], term:'SPF',
+   def:'SPF (Sender Policy Framework) lets a domain publish which servers are allowed to send its mail. PASS means the sending server was on that list.',
+   here: c => `SPF here: ${authTxt(c.auth.spf)}.`},
+  {keys:['dkim','domainkeys'], term:'DKIM',
+   def:'DKIM (DomainKeys Identified Mail) is a cryptographic signature added by the sending domain. PASS means the message was signed by that domain and was not changed in transit.',
+   here: c => `DKIM here: ${authTxt(c.auth.dkim)}.`},
+  {keys:['dmarc'], term:'DMARC',
+   def:'DMARC checks that SPF or DKIM passed for the same domain shown in the visible From address, and tells receivers what to do if not (none, quarantine or reject).',
+   here: c => `DMARC here: ${authTxt(c.auth.dmarc)}.`},
+  {keys:['email authentication','authentication results','authentication'], term:'Email authentication',
+   def:'Email authentication is the set of checks (SPF, DKIM, DMARC) that verify a message really comes from the domain it claims. Passing proves who sent it, not that the sender is trustworthy.',
+   here: c => `Here: SPF ${authTxt(c.auth.spf)}, DKIM ${authTxt(c.auth.dkim)}, DMARC ${authTxt(c.auth.dmarc)}.`},
+  {keys:['reply-to','reply to','replyto'], term:'Reply-To',
+   def:'Reply-To is a header that sends your reply to a different address than the sender. A Reply-To on a different domain is a classic fraud trick.',
+   here: c => c.replyTo ? `Here replies go to ${pii(c, c.replyTo)} instead of ${domainOf(c.from)}.` : 'This email has no Reply-To header.'},
+  {keys:['email header','headers','header','received header','received'], term:'Email headers',
+   def:'Headers are the technical lines at the top of an email: sender, recipient, subject, date, the Received chain of servers it passed through, and authentication results.',
+   here: c => `This email has ${c.receivedCount || c.hops.length + 1} Received headers; origin IP ${c.ip || 'unknown'}.`},
+  {keys:['hop','hops','latency','hop latency'], term:'Hop latency',
+   def:'Each mail server that relays the message is a hop. Hop latency is the delay at each one; unusually slow hops are a weak signal of odd relay infrastructure.',
+   here: c => c.hops.length ? `Hops here: ${c.hops.map(h => h + ' ms').join(', ')}.` : 'No hop timing is available.'},
+  {keys:['entropy','shannon entropy'], term:'Entropy',
+   def:'Entropy (0 to 8 bits per byte) measures how random a file\'s bytes look. Plain text is low; compressed, encrypted or packed files are high. It is a signal, not proof: normal PDFs and ZIPs are also high.',
+   here: c => c.attachment ? `${c.attachment} has entropy ${c.entropy != null ? c.entropy.toFixed(2) : 'n/a'}/8.` : 'No attachment, so no entropy to measure.'},
+  {keys:['hash','sha-256','sha256','sha','checksum','fingerprint'], term:'File hash (SHA-256)',
+   def:'A SHA-256 hash is a unique fingerprint of a file\'s exact bytes. Security tools share hashes to block or hunt a known file without passing the file around.',
+   here: c => c.hash ? `The attachment hash is ${c.hash}.` : 'No attachment hash in this case.'},
+  {keys:['sandbox','sandboxing','detonation','detonate'], term:'Sandbox',
+   def:'A sandbox is an isolated virtual machine where a suspicious file or link is opened safely to watch what it does. It is not 100% isolation: shared folders, clipboard and network bridges must be disabled. In TRACE-X the sandbox is simulated.',
+   here: c => { const q = componentsOf(c).filter(x => x.sandbox && x.status === 'Quarantined'); return q.length ? `Held for (simulated) detonation here: ${q.map(x => x.label).join(', ')}.` : 'Nothing in this case needs detonation.'; }},
+  {keys:['quarantine','quarantined','isolate'], term:'Quarantine',
+   def:'Quarantine means holding a suspicious message or component away from the user so it cannot be opened until it is analysed.',
+   here: c => { const q = componentsOf(c).filter(x => x.status === 'Quarantined'); return q.length ? `Quarantined here: ${q.map(x => x.label).join(', ')}.` : 'Nothing was quarantined.'; }},
+  {keys:['token','tokens','tokenization','tokenisation','tokenize','component token'], term:'Component tokens',
+   def:'TRACE-X splits an email into components (sender, Reply-To, subject, body, authentication, delivery path, link, attachment), scores each on its own, then fuses the scores into one risk.',
+   here: c => `This email has ${componentsOf(c).length} components.`},
+  {keys:['pii','personal data','masking','mask'], term:'PII masking',
+   def:'PII (personally identifiable information) masking replaces real email addresses with stable tokens like ADDR_01 so a report can be shared without exposing people.',
+   here: () => `Masking is currently ${state.maskPII ? 'on' : 'off'} (toggle it on the Tokens screen).`},
+  {keys:['ioc','iocs','indicator of compromise','indicators of compromise','indicator'], term:'IOC (indicator of compromise)',
+   def:'An IOC is a concrete artefact that identifies an attack: a sender address, domain, IP, URL or file hash. Defenders share IOCs to block and hunt the same attack.',
+   here: c => `${iocsOf(c).length} IOCs were derived from this case.`},
+  {keys:['stix','stix 2.1','taxii'], term:'STIX 2.1',
+   def:'STIX 2.1 is a standard JSON format for sharing threat intelligence such as indicators between security tools (SIEMs, threat-intel platforms).',
+   here: () => 'Export this case as STIX 2.1 from the IOC Hub.'},
+  {keys:['mitre','att&ck','mitre attack','technique','ttp'], term:'MITRE ATT&CK',
+   def:'MITRE ATT&CK is a public catalogue of attacker tactics and techniques, each with an ID (for example T1566 Phishing), used to describe attacks in a common language.',
+   here: c => c.mitre ? `Mapped here: ${c.mitre.id} ${c.mitre.name}.` : 'No technique applies to this benign email.'},
+  {keys:['asn','autonomous system'], term:'ASN',
+   def:'An ASN (autonomous system number) identifies the network operator that routes an IP address, for example a hosting company or ISP.',
+   here: c => c.asn ? `Here: ${c.asn} (simulated enrichment).` : 'No ASN data for this case.'},
+  {keys:['geolocation','attribution','geo'], term:'Geolocation vs attribution',
+   def:'Geolocation says roughly where a server is. Attribution says who is behind an attack. They are different: attackers rent servers anywhere, so a server\'s country never identifies the attacker.',
+   here: c => c.country ? `This server geolocates (simulated) to ${c.country}. That is not attribution.` : 'No geolocation data for this case.'},
+  {keys:['domain age','new domain','newly registered'], term:'Domain age',
+   def:'Domain age is how long ago a domain was registered. Phishing domains are often only days old, while real organisations\' domains are usually years old.',
+   here: c => c.domainAge != null ? `The ${c.domainAgeOf === 'sender' ? 'sender' : 'link'} domain here is ${c.domainAge} days old.` : 'Domain age was not looked up for this case.'},
+  {keys:['redirect','redirects','redirect chain'], term:'Redirect chain',
+   def:'A redirect chain is the series of hops a link goes through before the final page. Attackers use redirects to hide the real destination from filters.',
+   here: c => c.url ? `This link has ${c.redirects != null ? c.redirects : 'unknown'} redirect(s).` : 'No link in this email.'},
+  {keys:['https','ssl','tls','padlock'], term:'HTTPS',
+   def:'HTTPS means the connection to a website is encrypted. It does not mean the site is safe: most phishing sites use free HTTPS certificates.',
+   here: c => c.url ? `This link ${/^https:/i.test(c.url) ? 'uses' : 'does not use'} HTTPS.` : 'No link in this email.'},
+  {keys:['risk score','score','risk'], term:'Risk score',
+   def:'The risk score (0 to 100) summarises how dangerous the email looks: under 40 is low, 40 to 69 suspicious, 70 and above high risk. In TRACE-X it is built from per-component scores so every point is explainable.',
+   here: c => `This email: ${c.risk}/100 (${level(c.risk).label}).${isDemo(c) ? ' Preset scores are demo data.' : ''}`},
+  {keys:['social engineering','urgency','pressure'], term:'Social engineering',
+   def:'Social engineering manipulates people rather than computers: urgency ("within 24 hours"), fear ("account suspended"), authority ("CEO"), secrecy ("confidential") or rewards push the reader to act without thinking.',
+   here: c => { const f = languageFindings(c); return f.length ? `Tactics found here: ${[...new Set(f.map(x => x.cat))].join(', ')}.` : 'No social-engineering wording found in this email.'; }}
+];
+const DEFINITIONAL = /\b(what\s*(is|are|'s|s|does|do)|whats|meant|meaning|mean|define|definition|explain|stand(s)? for|difference between|tell me about)\b/i;
+/* Best glossary entry mentioned in the question (longest matching key wins) */
+function glossaryHit(q){
+  const toks = q.toLowerCase().replace(/[^a-z0-9&@.\s-]/g, ' ').split(/\s+/).filter(Boolean);
+  const text = ' ' + toks.join(' ') + ' ';
+  let best = null;
+  for (const g of GLOSSARY) for (const k of g.keys){
+    const hit = k.includes(' ') || k.includes('-') ? text.includes(' ' + k + ' ') : toks.some(t => wordMatch(t, k) >= 0.9);
+    if (hit && (!best || k.length > best.len)) best = {g, len:k.length, phrase:/[ -]/.test(k)};
+  }
+  return best;
+}
 /* Simulated analyst: scores the question against every topic (typo tolerant),
    answers the best match plus a second topic if the question covers two. */
 function answer(q, c){
   const hits = intentsOf(q);
+  // "What is / what is meant by X?" gets a definition plus what it means here,
+  // unless the question clearly asks about something specific in this email.
+  const gh = DEFINITIONAL.test(q) ? glossaryHit(q) : null, g = gh && gh.g;
+  const aboutThisEmail = /\b(this|these|here|found|the (e-?mail|mail|message|link|url|attachment|file|sender|subject|body))\b/i.test(q);
+  // A full glossary phrase ("malicious mail") asks for a definition; a single shared word
+  // ("malicious keywords") loses to a strong case topic.
+  const askedToDefine = /\b(define|definition|meaning|meant|stands? for)\b/i.test(q);
+  const minScore = aboutThisEmail ? 1 : gh && (gh.phrase || askedToDefine) ? Infinity : 2;
+  const specific = hits.find(h => h.score >= minScore && !['risk', 'summary', 'why', 'greet', 'attrib'].includes(h.id));
+  if (g && !specific) return `${g.term}: ${g.def}
+
+In this case: ${g.here(c)}`;
   if (!hits.length) return "I couldn't map that question to this case, so here's the short version:\n" + ANSWERS.summary(c);
   const picked = [hits[0]];
   // A second, distinct factual topic is answered too ("keywords and where is the server")
@@ -1188,7 +1312,7 @@ VIEWS.infrastructure = c => {
 
 VIEWS.ai = c => {
   const chat = state.chat[c.id] || (state.chat[c.id] = [{who:'ai', text:`I'm a simulated, rule-based analyst. I answer only from the fields of "${c.name}". Ask me why it's risky, about authentication, the link, the attachment, or what to do.`}]);
-  const sugg = ['What suspicious keywords are in this mail?', 'Summarize this email', 'Why is this risky?', 'Did SPF/DKIM/DMARC pass?', 'Tell me about the link', 'Is the attachment malicious?', 'Where is the infrastructure?', 'Which MITRE technique?', 'What should I do?'];
+  const sugg = ['What is a malicious email?', 'What suspicious keywords are in this mail?', 'Summarize this email', 'Why is this risky?', 'Did SPF/DKIM/DMARC pass?', 'Tell me about the link', 'Is the attachment malicious?', 'Where is the infrastructure?', 'Which MITRE technique?', 'What should I do?'];
   const comps = contributions(c, componentsOf(c)).sort((a, b) => b.points - a.points);
   return `${head('AI analysis', 'AI analysis', `${sourceChip(c)}${SIM('AI')}`)}
   <div class="grid g-hero">
