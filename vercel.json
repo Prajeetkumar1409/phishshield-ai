@@ -1,0 +1,17 @@
+{
+  "framework": null,
+  "installCommand": "npm --prefix server ci --omit=dev",
+  "buildCommand": "mkdir -p dist && cp client/public/trace-x.html dist/index.html && cp client/public/trace-x.html client/public/favicon.svg dist/",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/index.mjs": { "maxDuration": 60, "includeFiles": "server/src/**" }
+  },
+  "redirects": [
+    { "source": "/(analyze|dashboard|learn)", "destination": "/", "permanent": false },
+    { "source": "/scan/:id", "destination": "/", "permanent": false }
+  ],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.mjs" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

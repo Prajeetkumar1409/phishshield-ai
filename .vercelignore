@@ -1,0 +1,10 @@
+# anchored with a leading slash so nested folders (e.g. server/src/engines/ml) are not excluded
+/.git
+**/node_modules
+/client/dist
+/client/src
+/ml
+/extension
+*.zip
+/server/storage/*.json
+/server/tests

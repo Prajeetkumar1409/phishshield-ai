@@ -4,3 +4,4 @@ server/storage/*.json
 .env
 *.log
 *.tsbuildinfo
+.vercel
