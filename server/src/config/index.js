@@ -22,6 +22,17 @@ const config = {
     suspicious: 35,
     phishing: 65,
   },
+  // Attachments arrive base64-encoded in JSON; Vercel caps request bodies at 4.5 MB
+  maxAttachmentBytes: 3 * 1024 * 1024,
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || '',
+    model: process.env.GEMINI_MODEL || '', // empty: use defaultModel, falling back to the newest stable Flash
+    defaultModel: 'gemini-2.5-flash',
+  },
+  virustotal: {
+    apiKey: process.env.VIRUSTOTAL_API_KEY || '',
+    perMinute: Number(process.env.VIRUSTOTAL_PER_MINUTE) || 4, // free-tier quota
+  },
 };
 
 export default config;
