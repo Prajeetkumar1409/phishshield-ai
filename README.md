@@ -1,98 +1,108 @@
-# 🛡️ PhishShield AI — Phishing & Scam Detection
+# 🛡️ PhishShield AI + TRACE-X: Phishing & Email Forensics
 
-🔗 **Live demo:** https://phishshield-ai-scsa.onrender.com
+🔗 **Live demo:** https://client-roan-delta.vercel.app
 
-PhishShield AI analyses **emails, SMS, URLs and chat messages** and flags phishing attempts, suspicious links, impersonation and social-engineering patterns. Every verdict is explainable: it comes with highlighted evidence, per-engine scores and recommended next steps.
+PhishShield AI detects phishing emails, malicious links, malicious attachments, impersonation and social engineering, and explains every verdict. Its front end is **TRACE-X**, an email forensics workspace: open an email in Gmail, click the PhishShield extension, and TRACE-X shows who really sent it, where it travelled, what its links and attachments do, and what to do next.
 
-It ships as a **web app** (React + Express) plus a **Chrome extension**. All models are trained in-house at server start-up; no third-party AI APIs are called, and messages never leave the server.
+Every result is real analysis. There are no preset cases, and nothing about any verdict is hard-coded.
 
 ---
 
-## ✨ Features
+## ✨ What it does
 
 | | |
 |---|---|
-| 🧠 **NLP classifier** | TF-IDF (unigrams + bigrams) → L2-regularised logistic regression, with per-term explainability |
-| 🌐 **URL classifier** | 18 lexical/structural features, typosquat + homoglyph detection, risky TLDs, shorteners, raw-IP hosts, `@` obfuscation, punycode → logistic regression + expert rules |
-| 👤 **Impersonation** | Display-name spoofing, look-alike sender domains, Reply-To mismatch, free-webmail "organisations", brand claims that the links don't back up (28 brands) |
-| 🎭 **Social engineering** | 9 tactics: urgency, fear, rewards, credential harvesting, payment requests, secrecy, authority, calls to action, family pretexts |
-| 📈 **Anomaly detection** | Isolation Forests fit only on legitimate URLs and messages catch structurally unusual inputs |
-| ⚖️ **Score fusion** | Weighted noisy-OR: `risk = 1 − Π(1 − wᵢ·pᵢ)` → **safe** < 35 ≤ **suspicious** < 65 ≤ **phishing** |
-| 📊 **Dashboard** | KPIs, 14-day timeline, verdict mix, channels, top indicators, scan history |
-| 🧩 **Extension** | Scans the current tab, plus right-click "scan selected text / link" |
+| 📥 **Bring an email in** | From Gmail with the Chrome extension (one click), by pasting Gmail's *Show original*, by uploading an `.eml`, or with **Try a sample email** (a raw phishing email analysed live) |
+| 🧾 **Header forensics** | SPF / DKIM / DMARC, Reply-To mismatch, the Received chain, the originating IP and hop latency, parsed in the browser |
+| 🧠 **Phishing engines** | NLP (TF-IDF + logistic regression), URL classifier (18 features + rules), social-engineering tactics, impersonation and look-alike domains, and Isolation-Forest anomaly detection |
+| 🦠 **Malware detection** | Static analysis of every attachment on the server, never executed: real file type vs extension, executables, Office macros / remote templates / DDE, PDF JavaScript and launch actions, RTF exploits, HTML credential forms and HTML smuggling, archives hiding executables or passwords, PowerShell/VBS downloaders, packed or unsigned programs, and signature rules. The SHA-256 is checked on **VirusTotal** (70+ antivirus engines). |
+| 🌍 **Threat intel** | Domain age and registrar from **RDAP** registries; the sending IP's ASN, country and owner from **Team Cymru** and RDAP; VirusTotal reputation for links and the IP |
+| 🤖 **AI assistant** | **Google Gemini** writes the case summary and answers questions using only the open case's evidence |
+| ⚖️ **Explainable verdict** | Each part of the email is scored separately and fused with a weighted noisy-OR, `risk = 1 − Π(1 − wᵢ·sᵢ)`, with per-component points, highlighted suspicious wording and a MITRE ATT&CK mapping derived from the evidence |
+| 📤 **Outputs** | IOC Hub (JSON / CSV / STIX 2.1), infrastructure graph, and a printable 10-section incident report |
 
-## 🔬 TRACE-X: email forensics workspace
+## 🔬 How an email is analysed
 
-`/trace-x.html` ([client/public/trace-x.html](client/public/trace-x.html)) is a self-contained SOC-style forensics view (no framework, no build step, no localStorage). It also opens directly from disk.
+```
+Gmail / paste / .eml / sample
+        │
+        ▼
+TRACE-X (browser) ── parse headers, body, links, attachments ── SPF/DKIM/DMARC, Reply-To, Received chain
+        │
+        ▼  PhishShield API
+        ├── POST /analyze            NLP · URL · social engineering · impersonation · anomaly
+        ├── POST /attachments/scan   static malware analysis + VirusTotal (files never executed)
+        ├── POST /intel              RDAP domain age · Team Cymru ASN · VirusTotal reputation
+        └── POST /assistant          Gemini summary and chat (evidence only)
+        │
+        ▼
+Fused risk score, classification, MITRE mapping, IOCs, report
+```
 
-- **Four preset cases** (M365 credential phish, LockBit dropper, executive BEC, legitimate newsletter) built on documentation IPs/ASNs. Their numbers are labelled **demo data**.
-- **Upload .EML.** The parser really extracts From, Reply-To mismatch, Subject, Authentication-Results, Received count/origin IP/hop timing, the first URL, and the attachment filename with real SHA-256 and Shannon entropy. It then scores the message heuristically.
-- **Token-based analysis.** Each email component (sender, Reply-To, recipient, subject, auth, delivery path, link, attachment) is scored on its own. Components at ≥ 60 are quarantined, and the scores fuse with a weighted noisy-OR into the final risk. A **Mask PII** toggle tokenizes sender/receiver addresses.
-- **Safe link check.** Analyses an unknown URL lexically without ever opening it, and also asks the PhishShield `/api/v1/analyze` URL engine when the API is reachable.
-- **Explainable verdicts.** Every score is broken down into evidence and per-component points.
-- **Screens:** Overview, Headers, URLs, Attachments, IOC Hub (JSON / CSV / STIX 2.1 export), infrastructure graph, AI analysis with MITRE mapping and chat, and a printable 10-section report.
-- **Simulated parts:** sandbox detonation, threat-intel enrichment, geolocation and the AI chat. They are labelled as such in the UI. The sandbox screen documents the isolation policy a real analysis VM should enforce: no shared folders or clipboard, an isolated network, internet off by default, snapshots, nothing executed on the host, and a dedicated restricted VM.
+The pipeline bar in TRACE-X shows each stage's real status. If a stage fails, TRACE-X shows the actual error and works with what it has. If an optional key is missing, it says so instead of inventing results.
 
-## 🏗️ Architecture
+## 🧩 Chrome extension (v1.2)
+
+1. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and pick the `extension/` folder.
+2. **Gmail:** open an email, click the PhishShield icon → **Analyse in TRACE-X**, or right-click the email → **Analyse this email in TRACE-X**. The extension fetches Gmail's *Show original* (full headers) using your own logged-in session. If Gmail refuses, it rebuilds the email from the page and marks the case **NO HEADERS**.
+3. **Any page or link:** popup → **Check this page in TRACE-X**, or right-click a link → **Check this link in TRACE-X**. The link is analysed as text and never opened.
+4. **Paste:** paste an email's original source into the popup → **Analyse in TRACE-X**.
+
+The extension uses the live site by default. To use a local server, open the popup → ⚙ and enter `http://localhost:5000`. After updating the `extension/` folder, press **Reload** on its card in `chrome://extensions`.
+
+## 🏗️ Project structure
 
 ```
 phishshield-ai/
-├── server/                     Express REST API (layered)
+├── client/public/trace-x.html   TRACE-X: the whole front end (single file, no build step)
+├── extension/                   Chrome MV3 extension
+├── server/                      Express REST API
 │   └── src/
-│       ├── routes/             HTTP routing + rate limiting
-│       ├── middleware/         zod validation, error handling
-│       ├── controllers/        request → service → response
-│       ├── services/           analysis pipeline & fusion, history/stats
-│       ├── engines/            the AI
-│       │   ├── ml/             LogisticRegression, IsolationForest, StandardScaler
-│       │   ├── text/           tokenizer, TF-IDF, text classifier
-│       │   ├── url/            parser/extractor, features, brand matcher, classifier
-│       │   ├── patterns/       social engineering, impersonation
-│       │   └── anomaly/        anomaly detector
-│       ├── repositories/       scan persistence (JSON file; swappable for a DB)
-│       ├── data/               training corpus, labelled URLs, brand registry
-│       └── config/
-├── client/                     React 18 + TypeScript + Vite + Tailwind v4 + Framer Motion + Recharts
-└── extension/                  Chrome MV3 extension
+│       ├── routes/ middleware/ controllers/
+│       ├── services/            analysis fusion, VirusTotal, RDAP/Cymru intel, Gemini assistant
+│       ├── engines/
+│       │   ├── text/ url/ patterns/ anomaly/ ml/   phishing engines
+│       │   └── malware/                            static attachment analyser
+│       └── data/                training corpus, labelled URLs, brands
+├── api/index.mjs                Vercel serverless entry (runs the Express app)
+├── ml/train.py                  optional: retrain the NLP model on Enron + Nazario
+└── vercel.json                  Vercel: TRACE-X site + API function
 ```
 
-Request flow: `route → validate → controller → analysis.service → engines → fusion → repository`.
+`client/src` holds the earlier React interface. It is no longer served: the site is TRACE-X, and the old routes redirect to it.
 
 ## 🚀 Run locally
 
 Requires **Node.js 20+**.
 
 ```bash
-npm run install:all      # install server + client deps
-
-# terminal 1 — API on :5000
-npm run dev:server
-# terminal 2 — UI on :5173 (proxies /api to :5000)
-npm run dev:client
+npm run install:all
+npm run build && npm start        # → http://localhost:5000 (TRACE-X + API)
 ```
 
-Production mode (one process serves both the API and the built UI):
+To enable the AI assistant and VirusTotal locally, copy `server/.env.example` to `server/.env` and fill in the keys.
 
-```bash
-npm run build && npm start   # → http://localhost:5000
-```
-
-### Retrain the NLP model on real email corpora
-
-`ml/train.py` trains the text classifier on the **Nazario** phishing corpus (mbox) and **Enron** maildir (balanced), with a 70/15/15 split, C tuned on validation and final metrics on the held-out test set. It exports `server/models/text-model.json`, which the API loads at start-up. If that file is missing, the API falls back to the built-in corpus.
-
-```bash
-pip install -r ml/requirements.txt
-python ml/train.py --nazario data/nazario --enron data/enron_maildir
-```
-
-The script reimplements the JS tokenizer and TF-IDF in Python, so if you change `server/src/engines/text/tokenizer.js`, update `ml/train.py` to match and retrain.
-
-Tests (unit + API integration):
+Tests (engines, malware analyser, API):
 
 ```bash
 npm test
 ```
+
+## ⚙️ Environment variables
+
+| Var | Default | |
+|---|---|---|
+| `GEMINI_API_KEY` | – | AI assistant. Free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | optional; falls back to the newest stable Flash model |
+| `VIRUSTOTAL_API_KEY` | – | attachment / URL / IP reputation. Free key at [virustotal.com](https://www.virustotal.com) (profile → API key; 4 lookups/min) |
+| `PORT` | `5000` | |
+| `CORS_ORIGIN` | `*` | comma-separated origins |
+| `RATE_LIMIT_MAX` | `60` | analyses per minute per IP |
+| `MAX_HISTORY` | `500` | scans kept (legacy history API) |
+| `STORAGE_FILE` | `server/storage/scans.json` | |
+| `TEXT_MODEL_FILE` | `server/models/text-model.json` | optional NLP model exported by `ml/train.py` |
+
+Without `GEMINI_API_KEY` or `VIRUSTOTAL_API_KEY`, everything else still works, and TRACE-X shows those two parts as "not configured".
 
 ## 🔌 API
 
@@ -100,49 +110,44 @@ Base URL: `/api/v1`
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/analyze` | Body: `{ type: "email"\|"sms"\|"url"\|"message", content, sender?, subject?, save? }` |
-| `GET` | `/history?limit&offset&verdict&type` | Paginated scan summaries |
-| `GET` | `/history/:id` | Full scan result |
-| `DELETE` | `/history/:id` · `/history` | Delete one / clear all |
-| `GET` | `/stats` | Dashboard aggregates |
-| `GET` | `/models` | Model metadata |
-| `GET` | `/health` | Health check |
+| `POST` | `/analyze` | Phishing engines. Body: `{ type: "email"\|"sms"\|"url"\|"message", content, sender?, subject?, replyTo?, save? }` |
+| `POST` | `/attachments/scan` | Static malware analysis + VirusTotal. Body: `{ name, data }` (base64, ≤ 3 MB) or `{ name, sha256 }` |
+| `POST` | `/intel` | Body: `{ ip?, domains: [], urls: [] }`: RDAP domain age, ASN/country/owner, VirusTotal reputation |
+| `POST` | `/assistant` | Body: `{ evidence, question?, history?, mode: "chat"\|"summary" }`: Gemini answer |
+| `GET` | `/capabilities` | Which optional services are configured |
+| `GET` | `/health` · `/models` | Health check · model metadata |
+| `GET`/`DELETE` | `/history` · `/history/:id` · `/stats` | Scan history (used by the legacy React UI) |
 
 ```bash
-curl -X POST http://localhost:5000/api/v1/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"type":"sms","content":"Your KYC expired, account blocked today. Update: http://sbi-kyc-update.online/kyc"}'
+curl -X POST http://localhost:5000/api/v1/analyze -H "Content-Type: application/json" \
+  -d '{"type":"email","content":"Your account is limited. Verify now: http://paypa1-secure-login.com/verify"}'
 ```
 
 ## ☁️ Deploy
 
-### Option A: Render (recommended, single service, free)
-1. Push this folder to a GitHub repository.
-2. On [render.com](https://render.com): **New → Blueprint** → select the repo. `render.yaml` configures everything.
-3. When it's live, open `https://<your-app>.onrender.com`.
+**Vercel (current live site).** From the repo root run `vercel deploy --prod`. `vercel.json` serves TRACE-X and runs the API as one serverless function. Add `GEMINI_API_KEY` and `VIRUSTOTAL_API_KEY` under *Project → Settings → Environment Variables*, then redeploy.
 
-### Option B: Docker (any host: Railway, Fly.io, a VPS…)
+**Render / Docker.** `render.yaml` and the `Dockerfile` still work. The Express server serves TRACE-X at `/` and the API at `/api/v1`.
+
 ```bash
-docker build -t phishshield-ai .
-docker run -p 5000:5000 phishshield-ai
+docker build -t phishshield-ai . && docker run -p 5000:5000 -e GEMINI_API_KEY=... phishshield-ai
 ```
 
-### Option C: Split hosting (Vercel frontend + Render API)
-Deploy `server/` to Render, then deploy `client/` to Vercel with the env var `VITE_API_URL=https://<your-api>.onrender.com`. Set `CORS_ORIGIN` on the API to your Vercel URL.
+## 🧪 Retrain the NLP model (optional)
 
-> **Note:** scan history is kept in a JSON file. On free hosts with ephemeral disks it resets on redeploy. For permanent history, swap `server/src/repositories/scan.repository.js` for a database-backed implementation; nothing else needs to change.
+`ml/train.py` trains the text classifier on the **Nazario** phishing corpus and the **Enron** maildir: balanced classes, a 70/15/15 split, the regularisation strength tuned on validation, and metrics on the held-out test set. It exports `server/models/text-model.json`, which the API loads at start-up. Without that file, the API trains on its built-in corpus.
 
-## 🧩 Chrome extension
-1. Open `chrome://extensions` and enable **Developer mode**.
-2. Click **Load unpacked** and select the `extension/` folder.
-3. It uses the live server by default; to use a local one, open the popup → ⚙ → `http://localhost:5000`.
+```bash
+pip install -r ml/requirements.txt
+python ml/train.py --nazario data/nazario --enron data/enron_maildir
+```
 
-## ⚙️ Environment variables (server)
+The Python tokenizer mirrors `server/src/engines/text/tokenizer.js`. If you change one, change the other and retrain.
 
-| Var | Default | |
-|---|---|---|
-| `PORT` | `5000` | |
-| `CORS_ORIGIN` | `*` | comma-separated origins |
-| `RATE_LIMIT_MAX` | `60` | analyses per minute per IP |
-| `MAX_HISTORY` | `500` | scans kept |
-| `STORAGE_FILE` | `server/storage/scans.json` | |
+## 🔒 Privacy and limits
+
+- Attachments are only read as bytes, never opened or executed. Only file hashes, link URLs and the sending IP are sent to VirusTotal.
+- The AI assistant sends the open case's evidence, including a body excerpt, to Google Gemini. On Gemini's free tier, Google may use that data to improve its products, so don't use the free tier with confidential mail.
+- Geolocation shows where a server's network is registered, not who operated it.
+- Malware detection is static (structure, signatures and reputation). Brand-new malware can evade it; there is no live sandbox detonation.
+- The Gmail import reads mail through your own browser session. Nothing is stored on the server.
