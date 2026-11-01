@@ -1,4 +1,4 @@
-const DEFAULT_SERVER = 'https://phishshield-ai-scsa.onrender.com';
+const DEFAULT_SERVER = 'https://client-roan-delta.vercel.app';
 const $ = (id) => document.getElementById(id);
 
 async function getServer() {
@@ -6,80 +6,37 @@ async function getServer() {
   return server.replace(/\/$/, '');
 }
 
-async function analyze(type, content) {
-  const server = await getServer();
-  const res = await fetch(`${server}/api/v1/analyze`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type, content, save: true }),
-  });
-  const body = await res.json();
-  if (!res.ok) throw new Error(body.message || `HTTP ${res.status}`);
-  return body;
-}
-
-/** Build the result DOM with textContent only — never inject server strings as HTML. */
-function render(el, r) {
-  el.hidden = false;
-  el.className = `result ${r.verdict}`;
-  el.replaceChildren();
-
-  const head = document.createElement('div');
-  head.className = 'verdict';
-  const score = document.createElement('span');
-  score.className = 'score';
-  score.textContent = r.riskScore;
-  const pill = document.createElement('span');
-  pill.className = 'pill';
-  pill.textContent = r.verdict.toUpperCase();
-  head.append(score, pill);
-
-  const summary = document.createElement('div');
-  summary.className = 'summary';
-  summary.textContent = r.summary;
-
-  const list = document.createElement('ul');
-  for (const s of r.signals.filter((x) => x.severity !== 'info').slice(0, 4)) {
-    const li = document.createElement('li');
-    li.textContent = s.title;
-    list.append(li);
-  }
-  el.append(head, summary, list);
-}
-
-function renderError(el, err) {
+function showError(el, message) {
   el.hidden = false;
   el.className = 'result error';
-  el.textContent = `${err.message}. Check the server URL in settings (⚙).`;
+  el.textContent = message;
 }
 
-async function scanCurrentPage() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const url = tab?.url || '';
-  $('page-url').textContent = url || '—';
-  if (!/^https?:/.test(url)) {
-    $('page-result').className = 'result loading';
-    $('page-result').textContent = 'Not a web page.';
-    return;
-  }
-  try {
-    render($('page-result'), await analyze('url', url));
-  } catch (e) {
-    renderError($('page-result'), e);
-  }
+/**
+ * Every action hands off to the background worker, which opens TRACE-X with the result.
+ * The popup closes as soon as that tab opens, so only failures are ever shown here.
+ */
+async function handOff(button, resultEl, message) {
+  button.disabled = true;
+  resultEl.hidden = false;
+  resultEl.className = 'result loading';
+  resultEl.textContent = 'Opening TRACE-X…';
+  const res = await chrome.runtime.sendMessage(message);
+  button.disabled = false;
+  if (res?.ok) return;
+  showError(resultEl, `${res?.error || 'Something went wrong'}. Check the server URL in settings (⚙).`);
 }
 
-$('scan-text').addEventListener('click', async () => {
-  const text = $('text').value.trim();
-  if (!text) return;
-  $('scan-text').disabled = true;
-  try {
-    render($('text-result'), await analyze('message', text));
-  } catch (e) {
-    renderError($('text-result'), e);
-  } finally {
-    $('scan-text').disabled = false;
-  }
+let activeTab = null;
+
+$('gmail-tracex').addEventListener('click', () => handOff($('gmail-tracex'), $('gmail-result'), { type: 'gmail-tracex', tabId: activeTab.id }));
+
+$('page-tracex').addEventListener('click', () => handOff($('page-tracex'), $('page-result'), { type: 'link-tracex', url: activeTab.url }));
+
+$('paste-tracex').addEventListener('click', () => {
+  const raw = $('text').value;
+  if (!raw.trim()) return showError($('paste-result'), 'Paste the original email first');
+  handOff($('paste-tracex'), $('paste-result'), { type: 'paste-tracex', raw });
 });
 
 $('settings-btn').addEventListener('click', () => ($('settings').hidden = !$('settings').hidden));
@@ -92,7 +49,14 @@ $('save').addEventListener('click', async () => {
 async function init() {
   const server = await getServer();
   $('server').value = server;
-  $('open-app').href = `${server}/analyze`;
-  scanCurrentPage();
+  $('open-app').href = `${server}/trace-x.html`;
+
+  [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const url = activeTab?.url || '';
+  const isWeb = /^https?:/.test(url);
+  $('gmail-card').hidden = !/^https:\/\/mail\.google\.com\/mail\//.test(url);
+  // On Gmail the page URL is just the mailbox; the email card above is what matters.
+  $('page-card').hidden = !isWeb || !$('gmail-card').hidden;
+  $('page-url').textContent = url || '—';
 }
 init();

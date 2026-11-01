@@ -4,3 +4,8 @@ server/storage/*.json
 .env
 *.log
 *.tsbuildinfo
+.vercel
+
+# raw training datasets (Enron / Nazario)
+data/
+__pycache__/

@@ -30,3 +30,28 @@ export const validate = (schema, source = 'body') => (req, res, next) => {
   req.validated = result.data;
   next();
 };
+
+const base64Max = Math.ceil((config.maxAttachmentBytes * 4) / 3) + 4;
+
+export const attachmentSchema = z
+  .object({
+    name: z.string().trim().min(1).max(255),
+    data: z.string().max(base64Max, `Attachment is larger than ${config.maxAttachmentBytes / 1024 / 1024} MB; send its sha256 instead`).regex(/^[A-Za-z0-9+/=\s]*$/, 'data must be base64').optional(),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/i, 'sha256 must be 64 hex characters').optional(),
+  })
+  .refine((v) => v.data || v.sha256, 'Provide the file as base64 data or its sha256');
+
+export const intelSchema = z.object({
+  ip: z.string().trim().max(45).optional(),
+  domains: z.array(z.string().trim().min(1).max(253)).max(6).default([]),
+  urls: z.array(z.string().trim().url().max(2048)).max(5).default([]),
+});
+
+export const assistantSchema = z
+  .object({
+    evidence: z.record(z.any()).refine((e) => JSON.stringify(e).length <= 40000, 'Case evidence is too large'),
+    history: z.array(z.object({ role: z.enum(['user', 'assistant']), text: z.string().max(4000) })).max(20).default([]),
+    question: z.string().trim().max(1000).optional(),
+    mode: z.enum(['chat', 'summary']).default('chat'),
+  })
+  .refine((v) => v.mode === 'summary' || (v.question && v.question.length), 'Ask a question');

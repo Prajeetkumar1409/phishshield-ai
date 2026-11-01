@@ -11,6 +11,14 @@ export class LogisticRegression {
     this.bias = 0;
   }
 
+  /** Load pre-trained coefficients instead of fitting. */
+  static fromJSON({ weights, bias }) {
+    const m = new LogisticRegression();
+    m.weights = Float64Array.from(weights);
+    m.bias = bias;
+    return m;
+  }
+
   static sigmoid(z) {
     return 1 / (1 + Math.exp(-z));
   }

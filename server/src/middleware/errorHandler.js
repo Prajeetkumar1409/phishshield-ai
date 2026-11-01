@@ -7,10 +7,11 @@ export function notFound(req, res) {
 // eslint-disable-next-line no-unused-vars
 export function errorHandler(err, req, res, next) {
   const status = err.status || err.statusCode || 500;
-  if (status >= 500) console.error('[error]', err);
+  if (status >= 500 && !err.expose) console.error('[error]', err);
   res.status(status).json({
     error: status >= 500 ? 'InternalServerError' : err.name || 'Error',
-    message: status >= 500 && config.env === 'production' ? 'Something went wrong' : err.message,
+    // expose: errors written for end users (e.g. "assistant not configured") keep their message in production
+    message: status >= 500 && config.env === 'production' && !err.expose ? 'Something went wrong' : err.message,
   });
 }
 

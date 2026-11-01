@@ -9,7 +9,9 @@ const app = createApp();
 const server = app.listen(config.port, () => {
   const info = modelInfo();
   console.log(`🛡️  PhishShield AI API running on http://localhost:${config.port} (${config.env})`);
-  console.log(`   NLP model: ${info.textClassifier.vocabulary} terms, train acc ${info.textClassifier.trainAccuracy}`);
+  const nlp = info.textClassifier;
+  const nlpScore = nlp.testMetrics ? `test F1 ${nlp.testMetrics.f1}` : `train acc ${nlp.trainAccuracy}`;
+  console.log(`   NLP model (${nlp.source}): ${nlp.vocabulary} terms, ${nlpScore}`);
   console.log(`   URL model: ${info.urlClassifier.samples} samples, train acc ${info.urlClassifier.trainAccuracy}`);
 });
 

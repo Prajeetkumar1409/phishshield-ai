@@ -1,15 +1,24 @@
 {
   "manifest_version": 3,
   "name": "PhishShield AI",
-  "version": "1.0.0",
-  "description": "Check the current page, links and selected text for phishing and scams with PhishShield AI.",
+  "version": "1.2.0",
+  "description": "Send the open Gmail email, any link or page, or a pasted email to TRACE-X for phishing forensics.",
   "action": {
-    "default_title": "PhishShield AI",
+    "default_title": "PhishShield TRACE-X",
     "default_popup": "popup.html"
   },
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["activeTab", "contextMenus", "storage"],
-  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*", "https://*/*"]
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://*/*"
+  ]
 }
