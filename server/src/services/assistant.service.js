@@ -52,7 +52,8 @@ async function generate(contents, { retry = true } = {}) {
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM }] },
       contents,
-      generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
+      // Thinking models spend part of the output budget on reasoning, so leave headroom for the answer
+      generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
     }),
     signal: AbortSignal.timeout(30_000),
   });

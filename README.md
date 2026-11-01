@@ -93,7 +93,7 @@ npm test
 | Var | Default | |
 |---|---|---|
 | `GEMINI_API_KEY` | – | AI assistant. Free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | optional; falls back to the newest stable Flash model |
+| `GEMINI_MODEL` | `gemini-3.5-flash` | optional; falls back to the newest stable Flash model |
 | `VIRUSTOTAL_API_KEY` | – | attachment / URL / IP reputation. Free key at [virustotal.com](https://www.virustotal.com) (profile → API key; 4 lookups/min) |
 | `PORT` | `5000` | |
 | `CORS_ORIGIN` | `*` | comma-separated origins |
