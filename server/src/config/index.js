@@ -28,8 +28,8 @@ const config = {
   maxAttachmentBytes: 3 * 1024 * 1024,
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || '',
-    model: process.env.GEMINI_MODEL || '', // empty: use defaultModel, falling back to the newest stable Flash
-    defaultModel: 'gemini-2.5-flash',
+    model: process.env.GEMINI_MODEL || '', // empty: use defaultModel, falling back to the newest stable Flash if it is retired
+    defaultModel: 'gemini-3.5-flash',
   },
   virustotal: {
     apiKey: process.env.VIRUSTOTAL_API_KEY || '',
