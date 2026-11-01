@@ -243,6 +243,8 @@ pre.preview{margin:0;max-height:360px;overflow:auto;background:var(--card2);bord
 .msg.pending{opacity:.6}
 .msg.me{align-self:flex-end;background:var(--ink);color:var(--bg);border-bottom-right-radius:6px}
 .narr p+p{margin-top:10px}
+.body-text{white-space:pre-wrap;background:var(--card2);border:1px solid var(--line);border-radius:18px;padding:16px;font-size:14px;max-height:280px;overflow:auto;overflow-wrap:anywhere}
+mark{background:var(--amber-soft);color:var(--amber);border-radius:6px;padding:0 3px;font-weight:700}
 .report-sec{break-inside:avoid}
 .report-sec h2{display:flex;gap:10px;align-items:center}
 .report-sec h2 .n{font-family:var(--mono);font-size:13px;color:var(--pink)}
@@ -446,6 +448,35 @@ const SHORTENERS = ['bit.ly','tinyurl.com','t.co','goo.gl','is.gd','cutt.ly','ow
 const FREEMAIL = new Set(['gmail.com','outlook.com','hotmail.com','yahoo.com','aol.com','icloud.com','gmx.com','mail.com','proton.me','protonmail.com','yandex.com','zoho.com','rediffmail.com']);
 const URGENCY = ['urgent','immediately','action required','expire','final notice','overdue','suspend','verify','password','wire','confidential','invoice','payment','24 hours','today','locked','unusual','legal action'];
 
+const LEXICON = {
+  'Urgency': ['urgent','immediately','action required','expires','expire','24 hours','today','final notice','asap','right away','deadline','as soon as possible'],
+  'Credential theft': ['password','verify your account','verify','login','log in','sign in','credentials','mailbox','reset','confirm your'],
+  'Financial pressure': ['wire transfer','wire','bank details','payment','invoice','overdue','outstanding amount','refund','gift card','new vendor'],
+  'Threat / fear': ['suspended','suspend','locked','legal action','disabled','terminated','losing access','penalty','unusual activity'],
+  'Secrecy': ['confidential',"don't discuss",'do not discuss','do not share',"don't tell",'keep this between','discreet'],
+  'Authority / pretext': ['board meeting',"can't talk",'security team','it support','ceo','administrator','sent from my phone'],
+  'Lure to act': ['open the attached','click here','download','keep my password','use the link','reply to me directly']
+};
+const reEsc = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/* Phishing-style wording in subject, body, display name and attachment names */
+function languageFindings(c){
+  const fields = [['subject', c.subject], ['body', c.bodyText], ['display name', c.fromName], ['attachment name', c.attachments.map(a => a.name).join(' ')]];
+  const out = [];
+  for (const [cat, terms] of Object.entries(LEXICON)){
+    for (const term of terms){
+      const re = new RegExp('(^|[^a-z])' + reEsc(term) + '(?![a-z])', 'i');
+      const where = fields.filter(([, v]) => v && re.test(v)).map(([k]) => k);
+      if (where.length && !out.some(o => o.term.includes(term) || term.includes(o.term))) out.push({cat, term, where});
+    }
+  }
+  return out;
+}
+function highlightBody(c, text = c.bodyText){
+  const terms = languageFindings(c).map(f => esc(f.term)).sort((a, b) => b.length - a.length);
+  const html = esc(pii(c, (text || '').slice(0, 20000)));
+  if (!terms.length) return html;
+  return html.replace(new RegExp('(^|[^a-z])(' + terms.map(reEsc).join('|') + ')(?![a-z])', 'gi'), '$1<mark>$2</mark>');
+}
 function regDomain(h){
   const p = h.split('.');
   if (p.length <= 2) return h;
@@ -721,6 +752,21 @@ function nodeDetail(c, id){
     case 'url': { const top = rankedUrls(c)[0]; return [['URL', c.url], ['URL risk', `${top.risk}/100${top.eng ? ' (URL engine)' : ' (lexical)'}`], ['Domain', domText(domInfo(c, top.host))], ['VirusTotal', vtText(vtOfUrl(c, c.url))]]; }
   }
   return [];
+}
+/* "About this email" card: what the mail is, shown next to any infrastructure node */
+function emailContextCard(c){
+  const lf = languageFindings(c);
+  return `<section class="card"><div class="spread"><h2>About this email</h2>${riskChip(c.risk)}</div>
+    <div class="row" style="margin-bottom:14px"><span class="chip">${esc(c.classification)}</span>${c.mitre ? `<span class="chip pink">${esc(c.mitre.id)} · ${esc(c.mitre.name)}</span>` : ''}</div>
+    <dl class="kv"><dt>Subject</dt><dd><b>${esc(c.subject || '(none)')}</b></dd>
+      <dt>From</dt><dd class="mono">${esc(pii(c, c.from) || '-')}${c.fromName ? ` <span class="faint">(${esc(c.fromName)})</span>` : ''}</dd>
+      <dt>To</dt><dd class="mono">${esc(pii(c, c.to) || '-')}</dd><dt>Date</dt><dd>${esc(c.date || '-')}</dd>
+      ${c.replyTo ? `<dt>Reply-To</dt><dd class="mono">${esc(pii(c, c.replyTo))}</dd>` : ''}
+      <dt>Riskiest link</dt><dd class="mono">${esc(c.url || 'none')}</dd>
+      <dt>Attachments</dt><dd class="mono">${esc(c.attachments.map(a => a.name).join(', ') || 'none')}</dd></dl>
+    <p class="small" style="margin:14px 0 6px"><b>What it's about:</b> ${esc(narrative(c)[0])}</p>
+    ${c.bodyText ? `<p class="small muted" style="margin:10px 0 6px">Message${lf.length ? ` (${lf.length} suspicious phrase${lf.length > 1 ? 's' : ''} highlighted)` : ''}:</p><div class="body-text" style="max-height:220px">${highlightBody(c)}</div>` : ''}
+    <div class="row" style="margin-top:14px">${goBtn('overview', 'Overview')}${goBtn('ai', 'AI analysis')}${goBtn('report', 'Report')}</div></section>`;
 }
 function recommendations(c){
   const L = level(c.risk), r = [], tac = c.engines ? c.engines.tactics : [];
@@ -1307,6 +1353,7 @@ VIEWS.infrastructure = c => {
       <button class="btn sm primary" type="button" data-action="node-ioc">Show in IOC Hub</button></div></div>
       <dl class="kv">${nodeDetail(c, sel.id).map(([k, v]) => `<dt>${esc(k)}</dt><dd class="${k === 'URL' || k === 'Address' || k === 'IP' || k === 'Domain' ? 'mono' : ''}">${esc(v)}</dd>`).join('')}</dl></section>`
     : `<section class="card"><p class="muted">Select a node (click, or Tab then Enter) to inspect it.</p></section>`;
+  const details = `<div class="grid g2" style="align-items:start">${panel}${emailContextCard(c)}</div>`;
   const ipStatus = c.intel && c.intel.ip ? c.intel.ip.status : null;
   return `${head('Infrastructure', 'Infrastructure graph', sourceChip(c))}
   ${c.stages.intel === 'pending' ? '<div class="note">Looking up registries (RDAP, Team Cymru) and reputation…</div>' : c.stages.intel === 'error' ? `<div class="note bad">Threat-intel lookup failed: ${esc(c.errors.intel)}</div>` : ''}
@@ -1314,7 +1361,7 @@ VIEWS.infrastructure = c => {
   <section class="card"><div class="spread"><span class="badge-attr">INFRASTRUCTURE GEOLOCATION — NOT ATTRIBUTION</span><span class="row">${SRC('RDAP REGISTRIES')}${SRC('TEAM CYMRU ASN')}${state.caps && state.caps.virustotal ? SRC('VIRUSTOTAL') : ''}</span></div>
     <div class="graph-wrap">${svg}</div>
     <p class="small faint">Email → Sender domain → IP → ASN → Country → Network owner → Riskiest link. Nodes the case lacks are omitted (${7 - N} omitted).</p></section>
-  ${panel}`;
+  ${details}`;
 };
 
 VIEWS.ai = c => {
@@ -1341,6 +1388,9 @@ VIEWS.ai = c => {
         <ul class="clean">${comps.filter(x => x.points > 0).map(x => `<li><div class="spread small"><span><b>${esc(x.label)}</b></span><span class="mono">+${x.points}</span></div>${bar(x.points / Math.max(1, c.risk) * 100, level(x.score).col)}<div class="small faint">${esc(x.reasons[0].t)}</div></li>`).join('') || '<li class="muted">No component contributes risk.</li>'}</ul></section>
     </div>
   </div>
+  ${c.bodyText ? `<section class="card"><div class="spread"><h2>Suspicious language</h2><span class="small faint">${languageFindings(c).length} phrase(s) highlighted · parsed body</span></div>
+    <div class="row" style="margin-bottom:12px">${[...new Set(languageFindings(c).map(f => f.cat))].map(cat => `<span class="chip amber">${esc(cat)}</span>`).join('') || '<span class="chip green">No phishing-style wording</span>'}</div>
+    <div class="body-text">${highlightBody(c)}</div></section>` : ''}
   <section class="card"><div class="spread"><h2>Ask the assistant</h2>${caps.assistant ? '<span class="small faint">Google Gemini · answers from this case\'s evidence only</span>' : ''}</div>
     ${!caps.assistant ? `<div class="note">${state.caps ? unavailable : 'Connecting…'}</div>` : `
     <div class="chat-log" id="chat-log" aria-live="polite">${[{who:'ai', text:`Ask me anything about "${c.name}". I answer from this case's evidence only.`}, ...chat].map(m => `<div class="msg ${m.who}${m.pending ? ' pending' : ''}">${esc(m.text)}</div>`).join('')}</div>
