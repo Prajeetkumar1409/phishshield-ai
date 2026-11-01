@@ -12,32 +12,41 @@
         <path d="M32 4 8 13v17c0 15 10 26 24 30 14-4 24-15 24-30V13L32 4Z" fill="url(#g)" />
         <path d="m22 32 7 7 13-14" fill="none" stroke="#05070f" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
-      <h1>PhishShield <span>AI</span></h1>
+      <h1>PhishShield <span>TRACE-X</span></h1>
       <button id="settings-btn" title="Settings" aria-label="Settings">⚙</button>
     </header>
 
     <section id="settings" hidden>
-      <label for="server">Server URL</label>
+      <label for="server">TRACE-X server URL</label>
       <div class="row">
-        <input id="server" placeholder="https://your-app.onrender.com" />
+        <input id="server" placeholder="https://your-app.vercel.app" />
         <button id="save">Save</button>
       </div>
+    </section>
+
+    <section class="card" id="gmail-card" hidden>
+      <div class="label">This Gmail email</div>
+      <div class="hint">Full forensic analysis (headers, SPF/DKIM/DMARC, links, attachments) of the email open in this tab.</div>
+      <button id="gmail-tracex" class="primary">Analyse in TRACE-X</button>
+      <div id="gmail-result" class="result" hidden></div>
     </section>
 
     <section class="card" id="page-card">
       <div class="label">This page</div>
       <div id="page-url" class="mono">—</div>
-      <div id="page-result" class="result loading">Scanning…</div>
+      <button id="page-tracex" class="primary">Check this page in TRACE-X</button>
+      <div id="page-result" class="result" hidden></div>
     </section>
 
     <section class="card">
-      <div class="label">Scan a message</div>
-      <textarea id="text" rows="4" placeholder="Paste an email, SMS or chat message…"></textarea>
-      <button id="scan-text" class="primary">Analyze</button>
-      <div id="text-result" class="result" hidden></div>
+      <div class="label">Paste an email</div>
+      <div class="hint">Gmail: ⋮ → Show original → Copy to clipboard, then paste here.</div>
+      <textarea id="text" rows="4" placeholder="Delivered-To: …&#10;From: …&#10;Subject: …"></textarea>
+      <button id="paste-tracex" class="primary">Analyse in TRACE-X</button>
+      <div id="paste-result" class="result" hidden></div>
     </section>
 
-    <footer><a id="open-app" href="#" target="_blank">Open full analyzer ↗</a></footer>
+    <footer><a id="open-app" href="#" target="_blank">Open TRACE-X ↗</a></footer>
     <script src="popup.js"></script>
   </body>
 </html>
